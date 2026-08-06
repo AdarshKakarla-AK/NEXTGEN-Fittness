@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b0764"/>
+      <stop offset="1" stop-color="#701a75"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.2" r="0.8">
+      <stop offset="0" stop-color="#a855f7" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect width="1200" height="800" fill="url(#grid)"/>
+  <rect width="1200" height="800" fill="url(#glow)"/>
+  <g transform="translate(600 340)" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="18" stroke-linecap="round">
+    <rect x="-180" y="-60" width="140" height="120" rx="18"/>
+    <rect x="40" y="-60" width="140" height="120" rx="18"/>
+    <path d="M-180 -20 h-60 M-180 20 h-60 M40 -20 h60 M180 -20 h60 M180 20 h60 M40 20 h60"/>
+  </g>
+  <text x="600" y="620" text-anchor="middle" font-family="Poppins, system-ui, sans-serif" font-size="44" font-weight="700" fill="rgba(255,255,255,0.9)" letter-spacing="2">Transformation · 4 months</text>
+</svg>

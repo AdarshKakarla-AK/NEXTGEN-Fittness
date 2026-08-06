@@ -1,0 +1,44 @@
+{
+  "name": "nextgen-fitness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NEXTGEN FITNESS — Premium gym management & fitness platform demo",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.43.0",
+    "lucide-react": "^1.28.0",
+    "next": "16.2.12",
+    "qrcode": "^1.5.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.10.1",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "sharp": "0.35.3"
+    },
+    "postcss": "8.5.25"
+  }
+}
