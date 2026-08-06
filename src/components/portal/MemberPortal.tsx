@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   LayoutDashboard, CalendarDays, TrendingUp, Salad, Bell, LifeBuoy, Trophy, Flame,
   QrCode, CheckCircle2, Zap, Target, Clock, MapPin, MessageSquarePlus, ArrowRight,
+  Dumbbell, Receipt, Printer, Loader2, IndianRupee,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/client";
@@ -28,13 +29,20 @@ type P = {
   checkedInToday: boolean;
   branchName?: string;
   bookableClasses: { id: string; name: string; durationMin: number }[];
+  ptTrainers: { id: string; name: string; specialization: string[]; rating: number; reviewCount: number; hourlyRate: number; avatarColor?: string }[];
+  ptSessions: { trainerId: string; date: string; time: string }[];
+  payments: { id: string; ref: string; description: string; amount: number; status: string; method: string; invoiceNo?: string; createdAt: string }[];
+  invoices: { id: string; number: string; items: { name: string; qty: number; amount: number }[]; subtotal: number; gst: number; total: number; issuedAt: string }[];
+  gstin: string;
 };
 
 const TABS = [
   { key: "dash", label: "Dashboard", icon: LayoutDashboard },
   { key: "bookings", label: "Bookings", icon: CalendarDays },
+  { key: "training", label: "Training", icon: Dumbbell },
   { key: "progress", label: "Progress", icon: TrendingUp },
   { key: "nutrition", label: "Nutrition", icon: Salad },
+  { key: "payments", label: "Payments", icon: IndianRupee },
   { key: "notifications", label: "Alerts", icon: Bell },
   { key: "tickets", label: "Support", icon: LifeBuoy },
   { key: "achievements", label: "Achievements", icon: Trophy },
@@ -247,6 +255,19 @@ export function MemberPortal(p: P) {
               </div>
             )}
           </div>
+        )}
+
+        {tab === "training" && (
+          <PtBookingPanel trainers={p.ptTrainers} sessions={p.ptSessions} bookings={p.bookings} push={push} />
+        )}
+
+        {tab === "payments" && (
+          <PaymentsPanel
+            user={{ name: p.user.name, memberId: p.user.memberId ?? "", phone: p.user.phone }}
+            payments={p.payments}
+            invoices={p.invoices}
+            gstin={p.gstin}
+          />
         )}
 
         {tab === "progress" && (
@@ -494,5 +515,254 @@ function ClassBookingForm({ classes, push }: { classes: { id: string; name: stri
         </Button>
       </div>
     </form>
+  );
+}
+
+function nextDates(count = 7): string[] {
+  const out: string[] = [];
+  const d = new Date();
+  while (out.length < count) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0) out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function PtBookingPanel({
+  trainers,
+  sessions,
+  bookings,
+  push,
+}: {
+  trainers: P["ptTrainers"];
+  sessions: P["ptSessions"];
+  bookings: P["bookings"];
+  push: (msg: string, type?: "success" | "error" | "info") => void;
+}) {
+  const dates = nextDates(7);
+  const [trainerId, setTrainerId] = React.useState(trainers[0]?.id ?? "");
+  const [date, setDate] = React.useState(dates[0] ?? "");
+  const [time, setTime] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [done, setDone] = React.useState<string | null>(null);
+
+  const trainer = trainers.find((t) => t.id === trainerId);
+  const taken = trainerId && date ? sessions.filter((s) => s.trainerId === trainerId && s.date === date).map((s) => s.time) : [];
+  const myBusy = date ? bookings.filter((b) => b.date === date && (b.status === "upcoming" || b.status === "confirmed" || b.status === "waitlisted")).map((b) => b.time) : [];
+  const slots = Array.from({ length: 15 }, (_, i) => `${String(6 + i).padStart(2, "0")}:00`);
+  const disabled = (t: string) => taken.includes(t) || myBusy.includes(t);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trainerId || !date || !time) return push("Pick a trainer, date and time slot.", "error");
+    setBusy(true);
+    const res = await fetch("/api/portal/pt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trainerId, date, time, notes }) });
+    const json = await res.json();
+    setBusy(false);
+    if (!res.ok) return push(json.error || "Could not book the session.", "error");
+    push(`PT session confirmed — ${trainer?.name ?? "trainer"} on ${date} at ${time}.`);
+    setDone(json.ref ?? "booked");
+    setTime("");
+    setNotes("");
+    setTimeout(() => window.location.reload(), 900);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Dumbbell className="size-5 text-volt-500" />
+        <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Book a personal training session</h2>
+      </div>
+
+      <form onSubmit={submit} className="card-shadow rounded-3xl border border-ink-100 bg-card p-6 dark:border-ink-100">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-ink-500">Coach</span>
+            <select value={trainerId} onChange={(e) => setTrainerId(e.target.value)} className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none">
+              {trainers.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} · ₹{t.hourlyRate.toLocaleString("en-IN")}/hr</option>
+              ))}
+            </select>
+            {trainer && (
+              <span className="mt-1.5 block text-[11px] text-ink-400">
+                {trainer.specialization.join(", ")} · ⭐ {trainer.rating.toFixed(1)} ({trainer.reviewCount})
+              </span>
+            )}
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-ink-500">Date</span>
+            <select value={date} onChange={(e) => { setDate(e.target.value); setTime(""); }} className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none">
+              {dates.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-ink-500">Notes (optional)</span>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Goal, injury, focus…" className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none" />
+          </label>
+        </div>
+
+        <p className="mt-5 text-xs font-bold uppercase tracking-wide text-ink-400">Pick a 60-min slot ({trainer?.name ?? "coach"})</p>
+        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+          {slots.map((t) => {
+            const off = disabled(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                disabled={off}
+                onClick={() => setTime(t)}
+                className={cn(
+                  "rounded-xl border px-2 py-2 text-sm font-semibold transition",
+                  time === t
+                    ? "border-volt-500 bg-gradient-to-r from-volt-500 to-volt-600 text-white shadow"
+                    : off
+                      ? "cursor-not-allowed border-ink-100 bg-ink-50 text-ink-300 line-through dark:border-ink-100 dark:bg-ink-100"
+                      : "border-ink-200 bg-paper text-ink-700 hover:border-volt-500/50"
+                )}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[11px] text-ink-400">Slots shown as booked are unavailable. The coach sees your booking on their schedule instantly.</p>
+
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <p className="text-sm text-ink-500">Pay at the front desk — <span className="font-bold text-ink-700 dark:text-ink-600">₹{(trainer?.hourlyRate ?? 0).toLocaleString("en-IN")}/hr</span></p>
+          <Button type="submit" disabled={busy || !trainerId || !date || !time || !!done}>
+            {done ? "Booked ✓" : busy ? (<><Loader2 className="size-4 animate-spin" /> Booking…</>) : "Book session"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+function PaymentsPanel({ user, payments, invoices, gstin }: { user: { name: string; memberId: string; phone: string }; payments: P["payments"]; invoices: P["invoices"]; gstin: string }) {
+  const [receipt, setReceipt] = React.useState<{ payment: P["payments"][number]; invoice: P["invoices"][number] | undefined } | null>(null);
+  const invoiceByNumber = new Map(invoices.map((i) => [i.number, i]));
+  const badgeTone = (status: string) =>
+    status === "paid" ? "bg-volt-500/10 text-volt-600 dark:text-volt-400" : status === "pending" ? "bg-amber-500/10 text-amber-600" : status === "refunded" ? "bg-ink-500/10 text-ink-500" : "bg-stop-500/10 text-stop-500";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Receipt className="size-5 text-volt-500" />
+        <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Payments & receipts</h2>
+      </div>
+
+      {payments.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-ink-200 p-10 text-center text-sm text-ink-400">No payments yet.</p>
+      ) : (
+        <div className="overflow-hidden rounded-3xl border border-ink-100 bg-card dark:border-ink-100">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-400 dark:border-ink-100">
+                <th className="px-5 py-3.5 font-semibold">Ref</th>
+                <th className="px-5 py-3.5 font-semibold">Description</th>
+                <th className="px-5 py-3.5 font-semibold">Date</th>
+                <th className="px-5 py-3.5 font-semibold">Status</th>
+                <th className="px-5 py-3.5 text-right font-semibold">Amount</th>
+                <th className="px-5 py-3.5 text-right font-semibold">Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p) => {
+                const invoice = p.invoiceNo ? invoiceByNumber.get(p.invoiceNo) : undefined;
+                return (
+                  <tr key={p.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
+                    <td className="px-5 py-3.5 font-mono text-xs font-semibold text-accent-600 dark:text-accent-400">{p.ref}</td>
+                    <td className="px-5 py-3.5 text-ink-700 dark:text-ink-600">{p.description}</td>
+                    <td className="px-5 py-3.5 text-ink-400">{p.createdAt.slice(0, 10)}</td>
+                    <td className="px-5 py-3.5"><span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize", badgeTone(p.status))}>{p.status}</span></td>
+                    <td className="px-5 py-3.5 text-right font-bold text-ink-700 dark:text-ink-600">{inr(p.amount)}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      {invoice ? (
+                        <button onClick={() => setReceipt({ payment: p, invoice })} className="text-xs font-bold text-volt-600 hover:underline dark:text-volt-400">
+                          View invoice
+                        </button>
+                      ) : (
+                        <span className="text-xs text-ink-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {receipt && (
+        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-night-950/80 p-4 backdrop-blur" onClick={() => setReceipt(null)}>
+          <div className="card-shadow my-8 w-full max-w-xl rounded-3xl border border-ink-100 bg-white p-8 text-night-950 dark:border-ink-100" onClick={(e) => e.stopPropagation()}>
+            <div className="print-area">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-display text-xl font-extrabold">NEXTGEN FITNESS</p>
+                  <p className="mt-0.5 text-xs text-ink-500">Premium Health Club · GSTIN {gstin}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Tax invoice</p>
+                  <p className="font-mono text-sm font-bold">{receipt.invoice?.number ?? receipt.payment.ref}</p>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Billed to</p>
+                  <p className="mt-1 font-semibold">{user.name}</p>
+                  <p className="text-xs text-ink-500">Member {user.memberId} · {user.phone}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Issued</p>
+                  <p className="mt-1 font-semibold">{receipt.invoice?.issuedAt.slice(0, 10) ?? receipt.payment.createdAt.slice(0, 10)}</p>
+                  <p className="text-xs text-ink-500">{receipt.payment.method.toUpperCase()} · {receipt.payment.ref}</p>
+                </div>
+              </div>
+              <table className="mt-6 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-200 text-[11px] uppercase tracking-wide text-ink-400">
+                    <th className="pb-2 text-left font-semibold">Item</th>
+                    <th className="pb-2 text-right font-semibold">Qty</th>
+                    <th className="pb-2 text-right font-semibold">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(receipt.invoice?.items ?? [{ name: receipt.payment.description, qty: 1, amount: receipt.invoice?.subtotal ?? receipt.payment.amount }]).map((it, i) => (
+                    <tr key={i} className="border-b border-ink-100">
+                      <td className="py-2.5">{it.name}</td>
+                      <td className="py-2.5 text-right">{it.qty}</td>
+                      <td className="py-2.5 text-right font-semibold">{inr(it.amount)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-b border-ink-100 text-ink-500">
+                    <td className="py-2.5">Subtotal</td><td></td>
+                    <td className="py-2.5 text-right">{inr(receipt.invoice?.subtotal ?? receipt.payment.amount)}</td>
+                  </tr>
+                  <tr className="border-b border-ink-100 text-ink-500">
+                    <td className="py-2.5">GST (18%)</td><td></td>
+                    <td className="py-2.5 text-right">{inr(receipt.invoice?.gst ?? 0)}</td>
+                  </tr>
+                  <tr className="text-ink-900">
+                    <td className="py-2.5 font-bold">Total</td><td></td>
+                    <td className="py-2.5 text-right font-extrabold">{inr(receipt.invoice?.total ?? receipt.payment.amount)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-6 border-t border-ink-100 pt-4 text-center text-[11px] text-ink-400">Thank you for training with NEXTGEN FITNESS. This is a computer-generated invoice.</p>
+            </div>
+            <div className="no-print mt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setReceipt(null)}>Close</Button>
+              <Button onClick={() => window.print()}> <Printer className="size-4" /> Print receipt</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

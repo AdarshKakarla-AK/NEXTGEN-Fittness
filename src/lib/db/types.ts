@@ -124,7 +124,7 @@ export type PayStatus = "paid" | "pending" | "failed" | "refunded";
 export interface Payment {
   id: string;
   ref: string;
-  memberId: string;
+  memberId?: string;
   membershipId?: string;
   bookingId?: string;
   orderId?: string;
@@ -135,7 +135,12 @@ export interface Payment {
   status: PayStatus;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  payerEmail?: string;
+  payerPhone?: string;
+  meta?: string;
   invoiceNo?: string;
+  refundRef?: string;
+  refundedAt?: string;
   createdAt: string;
 }
 

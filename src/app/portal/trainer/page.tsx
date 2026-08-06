@@ -90,6 +90,7 @@ export default async function TrainerPage() {
         time: b.time,
         durationMin: b.durationMin,
         member: userById[b.memberId]?.name ?? "Member",
+        memberPhone: userById[b.memberId]?.phone,
         price: b.price,
         status: b.status,
       }))}

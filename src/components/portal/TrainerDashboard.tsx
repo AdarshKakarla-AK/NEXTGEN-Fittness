@@ -25,7 +25,7 @@ type TrainerProps = {
   hourlyRate: number;
   kpis: Kpis;
   todaysSlots: { classId: string; className: string; color: string; time: string; durationMin: number; capacity: number }[];
-  upcomingSessions: { id: string; ref: string; date: string; time: string; durationMin: number; member: string; price: number; status: string }[];
+  upcomingSessions: { id: string; ref: string; date: string; time: string; durationMin: number; member: string; memberPhone?: string; price: number; status: string }[];
   plannedMembers: { memberId: string; name: string; avatarColor?: string; planName: string; goal: string; attendance: number; currentWeight?: number; startWeight?: number }[];
   reviews: { id: string; memberName: string; rating: number; comment: string; createdAt: string }[];
 };
@@ -137,7 +137,7 @@ export function TrainerDashboard({ name, rating, reviewCount, yearsExp, speciali
                         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent-100 text-xs font-bold text-accent-600 dark:bg-accent-800/40 dark:text-accent-400">{s.time}</span>
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-ink-900 dark:text-ink-700">{s.member}</p>
-                          <p className="text-xs text-ink-400">{s.durationMin} min · {s.ref}</p>
+                          <p className="text-xs text-ink-400">{s.durationMin} min · {s.ref}{s.memberPhone ? ` · ${s.memberPhone}` : ""}</p>
                         </div>
                         <Badge tone="blue">{inr(s.price)}</Badge>
                       </div>
@@ -169,7 +169,7 @@ export function TrainerDashboard({ name, rating, reviewCount, yearsExp, speciali
                     {upcomingSessions.map((s) => (
                       <tr key={s.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
                         <td className="py-3 pr-4 font-mono text-xs font-semibold text-accent-600 dark:text-accent-400">{s.ref}</td>
-                        <td className="py-3 pr-4 font-semibold text-ink-700">{s.member}</td>
+                        <td className="py-3 pr-4 font-semibold text-ink-700">{s.member}{s.memberPhone && <span className="ml-1 text-xs font-normal text-ink-400">· {s.memberPhone}</span>}</td>
                         <td className="py-3 pr-4 text-ink-500">{s.date}</td>
                         <td className="py-3 pr-4 text-ink-500">{s.time}</td>
                         <td className="py-3 pr-4 text-ink-400">{s.durationMin} min</td>

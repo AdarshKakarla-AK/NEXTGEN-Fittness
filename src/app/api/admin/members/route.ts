@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const user = await requireUser(["admin"]);
+    await requireUser(["admin"]);
     const db = getDB();
     const members = db.users
       .filter((u) => u.role === "member")
@@ -56,7 +56,6 @@ export async function PATCH(req: Request) {
     const value = body.value;
     if (!id || !action) return NextResponse.json({ error: "Missing id or action." }, { status: 400 });
 
-    const db = getDB();
     mutate((d) => {
       const member = d.users.find((u) => u.id === id && u.role === "member");
       if (!member) return;

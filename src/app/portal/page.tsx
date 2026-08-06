@@ -108,6 +108,26 @@ export default async function PortalPage() {
 
   const bookableClasses = db.classes.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, durationMin: c.durationMin }));
 
+  const ptTrainers = db.users
+    .filter((u) => u.role === "trainer" && u.active)
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      specialization: u.specialization ?? [],
+      rating: u.rating ?? 0,
+      reviewCount: u.reviewCount ?? 0,
+      hourlyRate: u.hourlyRate ?? 0,
+      avatarColor: u.avatarColor,
+    }));
+  const ptSessions = db.bookings
+    .filter((b) => b.type === "pt_session" && b.date >= todayISO && (b.status === "upcoming" || b.status === "confirmed"))
+    .map((b) => ({ trainerId: b.trainerId ?? "", date: b.date, time: b.time }));
+  const memberPayments = db.payments
+    .filter((p) => p.memberId === memberId)
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const memberInvoices = db.invoices.filter((i) => i.memberId === memberId);
+
   return (
     <MemberPortal
       user={{
@@ -144,6 +164,28 @@ export default async function PortalPage() {
       checkedInToday={checkedInToday}
       branchName={db.settings.branches[0]?.name}
       bookableClasses={bookableClasses}
+      ptTrainers={ptTrainers}
+      ptSessions={ptSessions}
+      payments={memberPayments.map((p) => ({
+        id: p.id,
+        ref: p.ref,
+        description: p.description,
+        amount: p.amount,
+        status: p.status,
+        method: p.method,
+        invoiceNo: p.invoiceNo,
+        createdAt: p.createdAt,
+      }))}
+      invoices={memberInvoices.map((i) => ({
+        id: i.id,
+        number: i.number,
+        items: i.items,
+        subtotal: i.subtotal,
+        gst: i.gst,
+        total: i.total,
+        issuedAt: i.issuedAt,
+      }))}
+      gstin={db.settings.gstin}
     />
   );
 }

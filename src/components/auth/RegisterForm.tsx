@@ -2,13 +2,62 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { UserRound, Ruler, PhoneCall, CreditCard, PartyPopper, Check } from "lucide-react";
+import { UserRound, Ruler, PhoneCall, CreditCard, PartyPopper, Check, ShieldCheck, Loader2 } from "lucide-react";
 import { Field, Input, Select, Textarea, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { errMsg } from "@/lib/client";
 import type { MembershipPlan } from "@/lib/db/types";
 
 const GOALS = ["Muscle Gain", "Fat Loss", "Strength", "Endurance", "General Fitness", "Rehab"];
+
+interface RazorpayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description?: string;
+  order_id: string;
+  prefill?: { name?: string; email?: string; contact?: string };
+  theme?: { color?: string };
+  handler: (response: RazorpayResponse) => void;
+  modal?: { ondismiss?: () => void };
+}
+
+interface RazorpayInstance {
+  on(event: string, callback: () => void): void;
+  open(): void;
+}
+
+interface WindowWithRazorpay extends Window {
+  Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+}
+
+type OrderResp = {
+  paymentRef: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  mode: "razorpay" | "demo";
+  keyId: string;
+  plan: string;
+};
+
+function loadRazorpayScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && (window as WindowWithRazorpay).Razorpay) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load the payment gateway. Check your connection."));
+    document.body.appendChild(s);
+  });
+}
 
 function StepBadge({ n, label, active }: { n: number; label: string; active: boolean }) {
   return (
@@ -21,13 +70,14 @@ function StepBadge({ n, label, active }: { n: number; label: string; active: boo
   );
 }
 
-export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
+export function RegisterForm({ plans, initialPlanId = "plan_monthly" }: { plans: MembershipPlan[]; initialPlanId?: string }) {
   const router = useRouter();
   const [step, setStep] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const [done, setDone] = React.useState<{ memberId: string; invoiceNo: string } | null>(null);
-  const [planId, setPlanId] = React.useState("plan_monthly");
+  const [done, setDone] = React.useState<{ memberId: string; invoiceNo: string; total: number } | null>(null);
+  const [planId, setPlanId] = React.useState(initialPlanId);
+  const [sandbox, setSandbox] = React.useState<{ order: OrderResp; form: Record<string, string> } | null>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
 
   const next = (e: React.FormEvent) => {
@@ -37,6 +87,59 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
   };
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
+  const capture = async (opts: { paymentRef: string; form: Record<string, string>; paymentId: string; signature: string }) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payments/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentRef: opts.paymentRef, form: opts.form, razorpayPaymentId: opts.paymentId, razorpaySignature: opts.signature }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Payment verification failed.");
+      setDone({ memberId: json.memberId, invoiceNo: json.invoiceNo, total: json.total });
+    } catch (err) {
+      setError(errMsg(err));
+      setBusy(false);
+    }
+  };
+
+  const openRazorpay = (order: OrderResp, form: Record<string, string>) =>
+    new Promise<void>((resolve) => {
+      loadRazorpayScript()
+        .then(() => {
+          const Ctor = (window as WindowWithRazorpay).Razorpay;
+          if (!Ctor) {
+            setError("The payment gateway could not be loaded.");
+            return resolve();
+          }
+          const rzp = new Ctor({
+            key: order.keyId,
+            amount: order.amount * 100,
+            currency: order.currency,
+            name: "NEXTGEN FITNESS",
+            description: order.plan,
+            order_id: order.orderId,
+            prefill: { name: form.name, email: form.email, contact: form.phone },
+            theme: { color: "#059669" },
+            handler: (response) => {
+              void capture({ paymentRef: order.paymentRef, form, paymentId: response.razorpay_payment_id, signature: response.razorpay_signature });
+              resolve();
+            },
+            modal: { ondismiss: () => resolve() },
+          });
+          rzp.on("payment.failed", () => {
+            setError("Payment failed. Please try again.");
+          });
+          rzp.open();
+        })
+        .catch((err) => {
+          setError(errMsg(err));
+          resolve();
+        });
+    });
+
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -45,14 +148,31 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
       const data = Object.fromEntries(new FormData(e.currentTarget).entries());
       data.planId = planId;
       data.agreed = "true";
-      const res = await fetch("/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const res = await fetch("/api/payments/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Registration failed");
-      setDone({ memberId: json.memberId, invoiceNo: json.invoiceNo });
+      if (!res.ok) throw new Error(json.error || "Could not create the payment order.");
+      const order = json as OrderResp;
+      setBusy(false);
+      if (order.mode === "razorpay") {
+        await openRazorpay(order, data as unknown as Record<string, string>);
+      } else {
+        setSandbox({ order, form: data as unknown as Record<string, string> });
+      }
     } catch (err) {
       setError(errMsg(err));
       setBusy(false);
     }
+  };
+
+  const confirmSandbox = async () => {
+    if (!sandbox) return;
+    await capture({
+      paymentRef: sandbox.order.paymentRef,
+      form: sandbox.form,
+      paymentId: `pay_demo_${Date.now().toString(36)}`,
+      signature: "demo",
+    });
+    setSandbox(null);
   };
 
   if (done) {
@@ -63,13 +183,15 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
             <PartyPopper className="size-8" />
           </span>
           <h2 className="font-display mt-5 text-3xl font-extrabold text-ink-900 dark:text-ink-700">You&apos;re in!</h2>
-          <p className="mt-2 text-sm text-ink-500">Welcome to NEXTGEN FITNESS. Here&apos;s your membership card — keep it for check-in.</p>
+          <p className="mt-2 text-sm text-ink-500">Payment received. Welcome to NEXTGEN FITNESS — here&apos;s your membership card, keep it for check-in.</p>
           <div className="mx-auto mt-6 max-w-sm rounded-2xl border border-ink-100 bg-paper p-5 text-left dark:border-ink-100">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Member ID</p>
-            <p className="font-display text-2xl font-extrabold text-volt-600 dark:text-volt-400">{done.memberId}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Amount paid</p>
+            <p className="font-display text-2xl font-extrabold text-volt-600 dark:text-volt-400">₹{done.total.toLocaleString("en-IN")}</p>
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-ink-400">Member ID</p>
+            <p className="text-sm font-semibold text-ink-700 dark:text-ink-600">{done.memberId}</p>
             <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-ink-400">Invoice</p>
             <p className="text-sm font-semibold text-ink-700 dark:text-ink-600">{done.invoiceNo}</p>
-            <p className="mt-3 text-[11px] text-ink-400">Welcome email, WhatsApp message and your GST invoice have been sent (demo mode).</p>
+            <p className="mt-3 text-[11px] text-ink-400">Welcome email, WhatsApp message and your GST receipt are available in your dashboard.</p>
           </div>
           <Button className="mt-7 w-full" onClick={() => router.push("/portal")}>
             Open my dashboard <span aria-hidden>→</span>
@@ -83,7 +205,7 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
     { label: "Personal" },
     { label: "Fitness" },
     { label: "Contact" },
-    { label: "Plan" },
+    { label: "Plan & pay" },
   ];
 
   return (
@@ -188,7 +310,9 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
                   <a href="/privacy-policy" target="_blank" className="font-semibold text-volt-600 dark:text-volt-400">Privacy Policy</a>, and I agree to the liability waiver.
                 </span>
               </label>
-              <p className="text-xs text-ink-400">Payment is a sandbox demo — no real charge. You&apos;ll get a Member ID, QR membership card, welcome email/WhatsApp and a GST invoice instantly.</p>
+              <p className="flex items-center gap-1.5 text-xs text-ink-400">
+                <ShieldCheck className="size-4 text-volt-500" /> Payment is processed securely via Razorpay. In sandbox demo mode no real charge is made.
+              </p>
             </div>
           )}
 
@@ -203,11 +327,37 @@ export function RegisterForm({ plans }: { plans: MembershipPlan[] }) {
             {step < 3 ? (
               <Button type="button" onClick={next}>Continue <span aria-hidden>→</span></Button>
             ) : (
-              <Button type="submit" disabled={busy}>{busy ? "Creating your membership…" : "Join — No joining fee"}</Button>
+              <Button type="submit" disabled={busy}>
+                {busy ? (<><Loader2 className="size-4 animate-spin" /> Creating your payment…</>) : ("Join & pay securely")}
+              </Button>
             )}
           </div>
         </form>
       </div>
+
+      {/* Sandbox demo payment overlay */}
+      {sandbox && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-night-950/90 p-4 backdrop-blur" onClick={() => !busy && setSandbox(null)}>
+          <div className="card-shadow w-full max-w-sm rounded-3xl border border-ink-100 bg-card p-8 text-center dark:border-ink-100" onClick={(e) => e.stopPropagation()}>
+            <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-volt-500 to-accent-600 text-white">
+              <ShieldCheck className="size-7" />
+            </span>
+            <p className="font-display mt-4 text-lg font-extrabold text-ink-900 dark:text-ink-700">NEXTGEN FITNESS</p>
+            <p className="mt-1 text-sm text-ink-400">Sandbox payment gateway (demo — no real charge)</p>
+            <div className="mt-5 rounded-2xl border border-ink-100 bg-paper p-4 dark:border-ink-100">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-ink-400">Amount payable</p>
+              <p className="font-display text-3xl font-extrabold text-ink-900 dark:text-ink-700">₹{sandbox.order.amount.toLocaleString("en-IN")}</p>
+              <p className="mt-1 text-xs text-ink-400">{sandbox.order.plan} · {sandbox.form.paymentMethod ?? "UPI"}</p>
+            </div>
+            <Button className="mt-6 w-full" onClick={confirmSandbox} disabled={busy}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : `Pay ₹${sandbox.order.amount.toLocaleString("en-IN")}`} {!busy && "— Simulate success"}
+            </Button>
+            <button onClick={() => setSandbox(null)} disabled={busy} className="mt-3 text-xs font-semibold text-ink-400 hover:text-ink-600">
+              Cancel payment
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

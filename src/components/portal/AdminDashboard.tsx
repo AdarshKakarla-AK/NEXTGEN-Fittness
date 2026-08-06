@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
 import { DonutChart, TrendAreaChart, WorkoutBarsChart } from "@/components/portal/PortalCharts";
+import { useToast } from "@/lib/client";
 import { cn } from "@/lib/utils";
 
 type Kpis = {
@@ -37,7 +38,7 @@ type AdminProps = {
   leadSource: { source: string; value: number }[];
   planDist: { name: string; value: number }[];
   trainers: { id: string; name: string; specialization: string; rating: number; reviewCount: number; upcoming: number; completed: number; revenue: number; utilization: number }[];
-  payments: { id: string; ref: string; description: string; amount: number; method: string; createdAt: string; member: string; invoiceNo?: string }[];
+  payments: { id: string; ref: string; description: string; amount: number; method: string; status: string; createdAt: string; member: string; invoiceNo?: string }[];
   recentAudit: { id: string; action: string; actor: string; meta?: string; createdAt: string }[];
 };
 
@@ -71,6 +72,23 @@ const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit }: AdminProps) {
   const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments">("overview");
+  const { push } = useToast();
+  const [refunding, setRefunding] = React.useState<string | null>(null);
+
+  const refund = async (id: string) => {
+    if (!window.confirm("Refund this payment and cancel the linked membership?")) return;
+    setRefunding(id);
+    try {
+      const res = await fetch("/api/payments/refund", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentId: id }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Refund failed");
+      push("Payment refunded");
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+      push(err instanceof Error ? err.message : "Refund failed", "error");
+      setRefunding(null);
+    }
+  };
 
   const funnelColors: Record<string, string> = { new: "#3385ff", contacted: "#22c55e", interested: "#eab308", demo_booked: "#f97316", negotiation: "#a855f7", won: "#22c55e", lost: "#ef4444" };
   const maxFunnel = Math.max(1, ...funnel.map((f) => f.value));
@@ -332,7 +350,7 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
               <Badge tone="green">{payments.length} recent</Badge>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px] text-left text-sm">
+              <table className="w-full min-w-[680px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-400 dark:border-ink-100">
                     <th className="pb-2.5 pr-4 font-semibold">Ref</th>
@@ -340,8 +358,10 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
                     <th className="pb-2.5 pr-4 font-semibold">Invoice</th>
                     <th className="pb-2.5 pr-4 font-semibold">Description</th>
                     <th className="pb-2.5 pr-4 font-semibold">Method</th>
+                    <th className="pb-2.5 pr-4 font-semibold">Status</th>
                     <th className="pb-2.5 pr-4 font-semibold">Date</th>
                     <th className="pb-2.5 text-right font-semibold">Amount</th>
+                    <th className="pb-2.5 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,8 +374,22 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
                       <td className="py-3 pr-4">
                         <Badge tone={p.method === "upi" ? "green" : p.method === "card" ? "blue" : p.method === "demo" ? "gold" : "gray"} className="capitalize">{p.method}</Badge>
                       </td>
+                      <td className="py-3 pr-4">
+                        <Badge tone={p.status === "paid" ? "green" : p.status === "pending" ? "orange" : p.status === "refunded" ? "gray" : "red"} className="capitalize">{p.status}</Badge>
+                      </td>
                       <td className="py-3 pr-4 text-ink-400">{p.createdAt.slice(0, 10)}</td>
-                      <td className="py-3 text-right font-bold text-ink-700">{inr(p.amount)}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-ink-700">{inr(p.amount)}</td>
+                      <td className="py-3 text-right">
+                        {p.status === "paid" && (
+                          <button
+                            onClick={() => refund(p.id)}
+                            disabled={refunding === p.id}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-stop-500 hover:underline disabled:opacity-50"
+                          >
+                            <RotateCcw className="size-3.5" /> {refunding === p.id ? "Refunding…" : "Refund"}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

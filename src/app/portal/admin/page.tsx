@@ -22,10 +22,10 @@ export default async function AdminPage() {
   const mrr = monthlyRecurringRevenue(db);
   const revenue = revenueTotals(db);
   const payments = db.payments
-    .filter((p) => p.status === "paid")
+    .filter((p) => p.status !== "pending")
     .slice()
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 8);
+    .slice(0, 10);
   const userById = Object.fromEntries(db.users.map((u) => [u.id, u]));
 
   const today = new Date().toISOString().slice(0, 10);
@@ -66,8 +66,9 @@ export default async function AdminPage() {
         description: p.description,
         amount: p.paidAmount,
         method: p.method,
+        status: p.status,
         createdAt: p.createdAt,
-        member: userById[p.memberId]?.name ?? "—",
+        member: p.memberId ? userById[p.memberId]?.name ?? "—" : "Guest",
         invoiceNo: p.invoiceNo,
       }))}
       recentAudit={db.auditLogs.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 8).map((l) => ({ id: l.id, action: l.action, actor: l.actorName ?? l.actorId, meta: l.meta, createdAt: l.createdAt }))}

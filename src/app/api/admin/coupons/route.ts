@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const user = await requireUser(["admin"]);
+    await requireUser(["admin"]);
     const db = getDB();
     const coupons = db.coupons
       .slice()
@@ -70,7 +70,6 @@ export async function PATCH(req: Request) {
     const id = String(body.id ?? "");
     const action = String(body.action ?? "");
     if (!id || action !== "toggle-active") return NextResponse.json({ error: "Missing id or action." }, { status: 400 });
-    const db = getDB();
     mutate((d) => {
       const coupon = d.coupons.find((c) => c.id === id);
       if (!coupon) return;

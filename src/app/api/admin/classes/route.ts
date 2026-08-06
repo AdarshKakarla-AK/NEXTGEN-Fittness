@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getDB, mutate } from "@/lib/db/store";
 import { audit } from "@/lib/notify";
+import { promoteWaitlist } from "@/lib/waitlist";
 
 export const runtime = "nodejs";
 
@@ -9,7 +10,7 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export async function GET() {
   try {
-    const user = await requireUser(["admin"]);
+    await requireUser(["admin"]);
     const db = getDB();
     const classes = db.classes
       .slice()
@@ -52,7 +53,6 @@ export async function PATCH(req: Request) {
     const action = String(body.action ?? "");
     const value = body.value;
     if (!id || !action) return NextResponse.json({ error: "Missing id or action." }, { status: 400 });
-    const db = getDB();
     mutate((d) => {
       const cls = d.classes.find((c) => c.id === id);
       if (!cls) return;
@@ -64,6 +64,8 @@ export async function PATCH(req: Request) {
         if (Number.isInteger(cap) && cap >= 1 && cap <= 200) {
           cls.capacity = cap;
           audit(d, user.id, user.name, "class.capacity_changed", cls.name, `capacity ${cap}`);
+          const dates = Array.from(new Set(d.bookings.filter((b) => b.classId === id && b.status === "waitlisted").map((b) => b.date)));
+          for (const date of dates) promoteWaitlist(d, id, date);
         }
       }
     });

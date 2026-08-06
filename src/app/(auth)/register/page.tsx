@@ -6,8 +6,10 @@ export const metadata = {
   description: "Join NEXTGEN FITNESS in under 2 minutes — no joining fee, instant member ID and QR membership card.",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
+  const { plan } = await searchParams;
   const db = getDB();
   const plans = db.plans.filter((p) => !["corporate"].includes(p.tier));
-  return <RegisterForm plans={plans} />;
+  const initialPlanId = plans.find((p) => p.slug === plan)?.id ?? "plan_monthly";
+  return <RegisterForm plans={plans} initialPlanId={initialPlanId} />;
 }

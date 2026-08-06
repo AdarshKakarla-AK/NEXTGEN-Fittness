@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { LayoutDashboard, LogOut, ArrowLeft, Dumbbell } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ToastProvider } from "@/lib/client";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -43,7 +44,9 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <ToastProvider>{children}</ToastProvider>
+      </main>
     </div>
   );
 }
