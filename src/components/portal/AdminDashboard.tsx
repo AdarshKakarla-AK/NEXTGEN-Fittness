@@ -6,7 +6,7 @@ import {
   Activity, ArrowDownRight, ArrowUpRight, CalendarCheck, CircleDollarSign, Clock4,
   CreditCard, Flame, Percent, ReceiptText, RotateCcw, ShieldAlert, Ticket, TrendingUp, Users, Boxes,
 } from "lucide-react";
-import { Card, Badge } from "@/components/ui";
+import { Card, Badge, Button } from "@/components/ui";
 import { DonutChart, TrendAreaChart, WorkoutBarsChart } from "@/components/portal/PortalCharts";
 import { useToast } from "@/lib/client";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,78 @@ function KpiCard({ icon, label, value, sub, delta, tone = "green" }: { icon: Rea
 }
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+function RemindersPanel() {
+  const [bookings, setBookings] = React.useState<{ id: string; ref: string; member: string; phone: string; type: string; time: string; class: string; reminded: boolean }[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+
+  const load = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/reminders");
+      if (res.ok) {
+        const d = await res.json();
+        setBookings(d.bookings ?? []);
+      }
+    } finally {
+      setBusy(false);
+      setLoaded(true);
+    }
+  };
+
+  const send = async () => {
+    setSending(true);
+    try {
+      const res = await fetch("/api/admin/reminders", { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Failed");
+      await load();
+      alert(`Reminders sent to ${d.sent} member(s) via WhatsApp.`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to send reminders");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Class reminders — tomorrow</h2>
+          <p className="mt-0.5 text-sm text-ink-400">WhatsApp nudges for tomorrow&apos;s bookings. Sent once per booking.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={load} disabled={busy} className="rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-bold text-ink-500 transition hover:bg-ink-100 dark:border-ink-100">
+            {busy ? "Loading…" : "Refresh"}
+          </button>
+          <Button onClick={send} disabled={sending || busy || bookings.filter((b) => !b.reminded).length === 0}>
+            {sending ? "Sending…" : `Send ${bookings.filter((b) => !b.reminded).length} reminder(s)`}
+          </Button>
+        </div>
+      </div>
+      {loaded && bookings.length === 0 && (
+        <p className="mt-4 rounded-xl bg-ink-50 p-4 text-center text-sm text-ink-400 dark:bg-ink-100">No bookings scheduled for tomorrow.</p>
+      )}
+      {bookings.length > 0 && (
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {bookings.map((b) => (
+            <div key={b.id} className={cn("rounded-xl border p-3.5", b.reminded ? "border-ink-100 bg-ink-50/60 dark:border-ink-100 dark:bg-ink-100" : "border-ink-100 dark:border-ink-100")}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-sm font-bold text-ink-900 dark:text-ink-700">{b.member}</p>
+                <Badge tone={b.reminded ? "green" : "orange"}>{b.reminded ? "Reminded" : "Pending"}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-ink-400">{b.class} · {b.time} · {b.ref}</p>
+              <p className="mt-1 text-xs text-ink-400">{b.phone}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit }: AdminProps) {
   const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments">("overview");
@@ -247,6 +319,8 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
               <WorkoutBarsChart data={attendanceHour.map((h) => ({ label: h.time, minutes: h.value, sessions: 0 }))} />
             </Card>
           </div>
+
+          <RemindersPanel />
 
           <div className="grid gap-5 lg:grid-cols-3">
             <Card className="p-5">

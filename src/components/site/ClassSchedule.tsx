@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Clock, Flame, Users, MapPin, ArrowRight } from "lucide-react";
 import { Stagger, StaggerItem } from "@/components/motion";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,7 @@ export function ClassCard({ cls }: { cls: ClassCardData }) {
     <StaggerItem>
       <div className="card-shadow group flex h-full flex-col overflow-hidden rounded-3xl border border-ink-100 bg-card dark:border-ink-100">
         <div className="relative h-44 overflow-hidden">
-          <img src={cls.image} alt={cls.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
+          <Image src={cls.image} alt={cls.name} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
           <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow" style={{ backgroundColor: cls.color }}>
             {cls.category}
           </span>

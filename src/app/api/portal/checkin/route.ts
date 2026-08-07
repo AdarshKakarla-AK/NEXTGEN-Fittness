@@ -22,9 +22,7 @@ export async function POST() {
         m.lastCheckInDate = date;
         m.streak = (m.streak ?? 0) + 1;
         m.xp = (m.xp ?? 0) + 15;
-        if ((m.xp ?? 0) >= (m.level ?? 1) * 500) {
-          m.level = (m.level ?? 1) + 1;
-        }
+        m.level = Math.min(10, Math.floor((m.xp ?? 0) / 300) + 1);
       }
       audit(d, user.id, user.name, "member.checkin", user.memberId, "QR turnstile");
     });

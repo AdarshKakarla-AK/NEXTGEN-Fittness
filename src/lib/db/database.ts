@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import type { DB } from "./types";
+import { buildSeed } from "./seed";
 
 export interface DatabaseHandle {
   get(): DB;
@@ -13,9 +14,21 @@ export interface DatabaseHandle {
 
 // Bump SCHEMA_VERSION when a migration below is added. Migrations run in order
 // on boot against any database that predates the current version.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 3;
 
-export const MIGRATIONS: ((db: DB) => void)[] = [];
+// Backfill the blogPosts collection for databases that predate it. Repeating
+// the backfill across versions keeps it idempotent and aligned to the index
+// scheme (migration at index N upgrades version N -> N+1).
+const backfillBlogPosts = (db: DB) => {
+  if (db.blogPosts.length > 0) return;
+  db.blogPosts = buildSeed().blogPosts;
+};
+
+export const MIGRATIONS: ((db: DB) => void)[] = [
+  backfillBlogPosts, // 0: v0 -> v1
+  backfillBlogPosts, // 1: v1 -> v2
+  backfillBlogPosts, // 2: v2 -> v3
+];
 
 const ARRAY_COLLECTIONS: (keyof DB)[] = [
   "users",
@@ -44,6 +57,7 @@ const ARRAY_COLLECTIONS: (keyof DB)[] = [
   "tickets",
   "coupons",
   "reviews",
+  "blogPosts",
   "referrals",
   "achievements",
   "challenges",

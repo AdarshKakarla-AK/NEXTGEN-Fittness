@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import type {
   DB, User, MembershipPlan, Membership, Payment, Invoice, Attendance, GymClass, ClassRoom, Booking,
   Exercise, WorkoutPlan, WorkoutLog, DietPlan, MealLog, DailyStat, Measurement, Equipment, InventoryItem,
-  Product, Order, Lead, Notification, Message, Ticket, Coupon, Review, Referral, Achievement, Challenge,
+  Product, Order, Lead, Notification, Message, Ticket, Coupon, Review, BlogPost, Referral, Achievement, Challenge,
   AutomationLog, AuditEntry, Settings, LeadSource, LeadStatus, NotifChannel,
 } from "./types";
 
@@ -734,6 +734,75 @@ export function buildSeed(): DB {
     { id: uid("cpn"), code: "WELCOME100", type: "flat", value: 100, maxUses: 1000, uses: 210, validFrom: daysAgo(200), validTo: daysAhead(150), active: true },
   ];
 
+  /* ----------------------------- Blog posts ---------------------------- */
+
+  const blogPosts: BlogPost[] = [
+    {
+      id: uid("blg"), slug: "the-4-day-upper-lower-split", title: "The 4-Day Upper/Lower Split: Build Strength Without the Burnout",
+      excerpt: "Four focused sessions a week is all you need for serious progress. Here's exactly how our strength coaches program the upper/lower split.",
+      cover: "/images/gallery-1.svg", author: "Karan Malhotra", authorRole: "Head Strength Coach", category: "Training",
+      tags: ["strength", "programming", "hypertrophy"], readTimeMin: 6, featured: true, publishedAt: tsAgo(4),
+      sections: [
+        { heading: "Why four days?", paragraphs: ["More isn't always better. Most lifters overtrain frequency and under-train intensity, spinning their wheels on five or six sessions a week. The upper/lower split trains each major pattern twice a week — the proven sweet spot for both strength and size.", "Recovery is where muscle is built. Four days leaves three full days for sleep, food and the rest of life, which is exactly why our members actually stick to it."] },
+        { heading: "The split", list: ["Day 1 — Upper (horizontal push/pull)", "Day 2 — Lower (squat dominant)", "Day 3 — Rest or active recovery", "Day 4 — Upper (vertical push/pull)", "Day 5 — Lower (hinge dominant)", "Day 6–7 — Rest"], paragraphs: ["By rotating the emphasis, you hit every muscle with variety while managing fatigue — the same pattern we program inside the NEXTGEN app."] },
+        { heading: "Programming rules of thumb", paragraphs: ["Lead with the big lifts early in the session, keep accessory volume between 8–15 reps, and leave 1–2 reps in reserve on the main work. Progressive overload is non-negotiable: add 2.5kg or a rep each week, no exceptions.", "Your coach can pull this exact template into your member app and adjust it around injuries, goals and available equipment."] },
+      ],
+    },
+    {
+      id: uid("blg"), slug: "protein-the-honest-guide", title: "Protein Intake: The Honest, No-Supplement-Required Guide",
+      excerpt: "How much protein do you actually need, and can you get it from food alone? We break down the numbers without the marketing.",
+      cover: "/images/gallery-2.svg", author: "Meera Krishnan", authorRole: "Lead Nutrition Coach", category: "Nutrition",
+      tags: ["nutrition", "protein", "diet"], readTimeMin: 5, publishedAt: tsAgo(9),
+      sections: [
+        { heading: "The real number", paragraphs: ["For most trainees, 1.6–2.2g of protein per kg of bodyweight per day covers muscle growth, repair and satiety. Below 1.2g you're leaving results on the table; beyond 2.2g you're mostly paying for expensive urine.", "A 70kg member targeting 2g/kg needs roughly 140g of protein a day — about 500g of chicken breast, or the same from paneer, eggs, dal, tofu and Greek yogurt combined."] },
+        { heading: "Food first", paragraphs: ["Whole food protein is usually cheaper and better for you than a tub of powder. If you're struggling to hit the target, one scoop of whey (20–25g) is a fine top-up, not a requirement.", "Spread intake across 3–4 meals of 30–40g each for better satiety and simpler planning."] },
+        { heading: "The NEXTGEN approach", paragraphs: ["Every member with a nutrition plan gets macros calculated from their body scan, not a guess. Meera's team re-baselines every month as body composition changes."] },
+      ],
+    },
+    {
+      id: uid("blg"), slug: "fix-your-posture-in-8-weeks", title: "How to Actually Fix Your Posture (It's Not Just 'Stand Up Straight')",
+      excerpt: "Desk posture is a training problem, not a willpower problem. Our physio-backed 8-week protocol reverses rounded shoulders and forward head.",
+      cover: "/images/gallery-3.svg", author: "Nisha Kapoor", authorRole: "Physiotherapist & Rehab Coach", category: "Recovery",
+      tags: ["posture", "rehab", "mobility"], readTimeMin: 7, publishedAt: tsAgo(15),
+      sections: [
+        { heading: "Why your posture got bad", paragraphs: ["Eight hours a day hunched over a laptop doesn't just feel bad — it shortens your chest and front-shoulder muscles while lengthening and weakening your upper back. No amount of 'remembering to sit up' fixes a strength imbalance; that's a job for training."] },
+        { heading: "The 8-week protocol", list: ["Weeks 1–2: thoracic mobility + daily wall slides", "Weeks 3–4: add face pulls and band pull-aparts, 3×15", "Weeks 5–6: introduce rows and rear-delt work, 3×12", "Weeks 7–8: pattern the new range in full lifts — squats, presses, carries"], paragraphs: ["Each phase builds on the last, and every one of these movements is available on our gym floor with a coach to cue you."] },
+        { heading: "Why it works", paragraphs: ["We're not chasing a mirror pose; we're restoring the joint ranges your sport and your day-to-day need. Members who finish the protocol report less neck pain, better breathing and — yes — noticeably straighter posture."] },
+      ],
+    },
+    {
+      id: uid("blg"), slug: "cardio-myths-debunked", title: "5 Cardio Myths Our Coaches Wish Would Die",
+      excerpt: "No, cardio doesn't kill your gains. No, you don't need to run for an hour to burn fat. The science, straight up.",
+      cover: "/images/gallery-4.svg", author: "Dev Patel", authorRole: "HIIT & Conditioning Coach", category: "Training",
+      tags: ["cardio", "fat loss", "myths"], readTimeMin: 5, publishedAt: tsAgo(20),
+      sections: [
+        { heading: "Myth 1: Cardio kills your gains", paragraphs: ["The interference effect is real but tiny. Two to three moderate cardio sessions a week barely dents strength progress and massively improves recovery and work capacity. Skip the endless steady-state treadmill sessions, not the cardio."] },
+        { heading: "Myth 2: Fat loss requires steady-state", paragraphs: ["Fat loss is driven by a calorie deficit, not the style of cardio. Short HIIT sessions burn fat and preserve more muscle than hour-long slogs, and they're dramatically easier to schedule."] },
+        { heading: "Myth 3: More is always better", paragraphs: ["Overtraining beats undertraining for nobody. Volume should be managed like a budget — spend where it matters. Our members get cardio programmed around their strength work, never thrown on top of it."] },
+      ],
+    },
+    {
+      id: uid("blg"), slug: "sleep-is-your-best-supplement", title: "Sleep Is Your Best Supplement (And You're Under-Dosing It)",
+      excerpt: "Training hard while sleeping badly is like filling a bathtub with the drain open. Here's the 7-night reset that fixes recovery, hunger and mood.",
+      cover: "/images/gallery-5.svg", author: "Arjun Nair", authorRole: "Combat & Recovery Coach", category: "Recovery",
+      tags: ["sleep", "recovery", "habits"], readTimeMin: 4, publishedAt: tsAgo(27),
+      sections: [
+        { heading: "The leaky bathtub", paragraphs: ["Muscle repair, hormone balance and appetite control all happen in deep sleep. Cut your sleep from 8 to 5 hours and your body secretes more ghrelin (hunger) and less leptin (satiety) — you'll fight your nutrition plan all day.", "Recovery isn't about the 45 minutes in the gym. It's the other 23 hours and 15 minutes. Sleep is the highest-leverage investment you can make."] },
+        { heading: "The 7-night reset", list: ["Same wake-up time every day, even weekends", "No caffeine after 2 PM", "Dim lights 60 minutes before bed", "Keep the bedroom cool (18–20°C)", "No screens in bed — reading only"], paragraphs: ["Members who run this for one week report better workouts, fewer cravings and noticeably better mood. Track it in the app with your daily log and watch the correlation appear."] },
+      ],
+    },
+    {
+      id: uid("blg"), slug: "hybrid-training-gym-and-running", title: "Can You Lift and Run in the Same Week? Yes — Here's How",
+      excerpt: "The hybrid athlete approach: how to combine strength training and running without half-doing either. A practical weekly template.",
+      cover: "/images/gallery-6.svg", author: "Ananya Rao", authorRole: "Mobility & Conditioning Coach", category: "Training",
+      tags: ["hybrid", "running", "strength"], readTimeMin: 6, publishedAt: tsAgo(35),
+      sections: [
+        { heading: "The hybrid template", list: ["Mon — Lower strength + easy run (30 min)", "Tue — Upper strength", "Wed — Interval run or tempo", "Thu — Rest or mobility flow", "Fri — Full-body strength", "Sat — Long easy run", "Sun — Rest"], paragraphs: ["Order matters: hard runs after legs, easy runs the day after. Keep your two hardest sessions apart so neither cannibalises the other."] },
+        { heading: "The rules that make it work", paragraphs: ["Recovery is the third discipline. Eat to support both goals, sleep seven-plus hours, and treat deload weeks as non-negotiable. Most members fail at hybrid training because they ignore the deload, not because the volume is impossible."] },
+      ],
+    },
+  ];
+
   /* ------------------------------ Reviews ------------------------------ */
 
   const reviews: Review[] = [
@@ -831,7 +900,7 @@ export function buildSeed(): DB {
   return {
     users, memberships, plans, payments, invoices, attendance, classes, rooms, bookings, exercises,
     workoutPlans, workoutLogs, dietPlans, mealLogs, dailyStats, measurements, equipment, inventory,
-    products, orders, leads, notifications, messages, tickets, coupons, reviews, referrals, achievements,
+    products, orders, leads, notifications, messages, tickets, coupons, reviews, blogPosts, referrals, achievements,
     challenges, otps: [], automationLogs, auditLogs, settings, counters: dbCounters,
   };
 }
@@ -884,6 +953,7 @@ export function shiftDemoDates(db: DB, days: number): void {
   db.messages.forEach((r) => { r.createdAt = shiftDateStr(r.createdAt, days); });
   db.tickets.forEach((r) => { r.createdAt = shiftDateStr(r.createdAt, days); if (r.updatedAt) r.updatedAt = shiftDateStr(r.updatedAt, days); r.replies.forEach((rep) => { rep.createdAt = shiftDateStr(rep.createdAt, days); }); });
   db.reviews.forEach((r) => { r.createdAt = shiftDateStr(r.createdAt, days); });
+  db.blogPosts.forEach((r) => { r.publishedAt = shiftDateStr(r.publishedAt, days); });
   db.achievements.forEach((r) => { r.unlockedAt = shiftDateStr(r.unlockedAt, days); });
   db.challenges.forEach((r) => { r.startsAt = shiftDateStr(r.startsAt, days); r.endsAt = shiftDateStr(r.endsAt, days); r.participants.forEach((p) => { p.updatedAt = shiftDateStr(p.updatedAt, days); }); });
   db.otps.forEach((r) => { r.expiresAt = shiftDateStr(r.expiresAt, days); });

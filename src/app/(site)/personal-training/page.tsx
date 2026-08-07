@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Check, ClipboardList, Activity, Salad, HeartPulse, TrendingUp, Dumbbell } from "lucide-react";
 import { getDB } from "@/lib/db/store";
 import { PageHero, CTAStrip, FinalCTA } from "@/components/site/PageHero";
@@ -34,7 +35,7 @@ export default function PersonalTrainingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="card-shadow overflow-hidden rounded-3xl border border-ink-100 bg-card dark:border-ink-100">
-              <img src="/images/class-strength.svg" alt="One-on-one strength coaching" className="h-64 w-full object-cover" loading="lazy" />
+              <div className="relative h-64 w-full"><Image src="/images/class-strength.svg" alt="One-on-one strength coaching" fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" /></div>
               <div className="p-8">
                 <h2 className="font-display text-2xl font-extrabold text-ink-900 dark:text-ink-700">Why one-on-one works</h2>
                 <p className="mt-3 text-sm leading-relaxed text-ink-500">
@@ -60,7 +61,7 @@ export default function PersonalTrainingPage() {
               </div>
             </div>
             <div className="card-shadow overflow-hidden rounded-3xl border border-ink-100 bg-card dark:border-ink-100">
-              <img src="/images/class-boxing.svg" alt="Boxing conditioning session" className="h-64 w-full object-cover" loading="lazy" />
+              <div className="relative h-64 w-full"><Image src="/images/class-boxing.svg" alt="Boxing conditioning session" fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" /></div>
               <div className="p-8">
                 <h2 className="font-display text-2xl font-extrabold text-ink-900 dark:text-ink-700">How it works</h2>
                 <ol className="mt-5 space-y-4">

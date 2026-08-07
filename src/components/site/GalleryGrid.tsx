@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export function GalleryGrid({ images }: { images: { src: string; alt: string; tag: string }[] }) {
@@ -22,7 +23,7 @@ export function GalleryGrid({ images }: { images: { src: string; alt: string; ta
       <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4">
         {images.map((img, i) => (
           <button key={img.src + i} onClick={() => setOpen(i)} className="group relative block w-full overflow-hidden rounded-2xl border border-ink-100 focus-visible:outline-none dark:border-ink-100">
-            <img src={img.src} alt={img.alt} className="w-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
+            <Image src={img.src} alt={img.alt} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
             <span className="absolute inset-0 flex items-end bg-gradient-to-t from-night-950/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100">
               <span className="p-4 text-left text-xs font-semibold text-white">{img.alt}</span>
             </span>
@@ -37,6 +38,7 @@ export function GalleryGrid({ images }: { images: { src: string; alt: string; ta
           <button className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition hover:bg-white/20" aria-label="Previous" onClick={(e) => { e.stopPropagation(); prev(); }}>
             <ChevronLeft className="size-6" />
           </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={images[open].src} alt={images[open].alt} className="max-h-[85vh] max-w-full rounded-2xl object-contain" onClick={(e) => e.stopPropagation()} />
           <button className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition hover:bg-white/20" aria-label="Next" onClick={(e) => { e.stopPropagation(); next(); }}>
             <ChevronRight className="size-6" />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Target, ShieldCheck, HeartHandshake, Lightbulb, MapPin, Users, Award, Dumbbell } from "lucide-react";
 import { getDB } from "@/lib/db/store";
 import { PageHero, CTAStrip, FinalCTA } from "@/components/site/PageHero";
@@ -44,7 +45,7 @@ export default function AboutPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div className="relative">
-              <img src="/images/hero-gym.svg" alt="NEXTGEN FITNESS floor" className="w-full rounded-3xl border border-ink-100 object-cover shadow-2xl dark:border-ink-100" loading="lazy" />
+              <Image src="/images/hero-gym.svg" alt="NEXTGEN FITNESS floor" fill sizes="(min-width: 1024px) 50vw, 100vw" className="rounded-3xl border border-ink-100 object-cover shadow-2xl dark:border-ink-100" />
               <div className="card-shadow absolute -bottom-6 -right-4 rounded-2xl border border-ink-100 bg-card px-6 py-4 dark:border-ink-100 sm:right-6">
                 <p className="font-display text-3xl font-extrabold text-gradient"><Counter value={9} suffix=" yrs" /></p>
                 <p className="text-xs font-semibold text-ink-400">of coaching excellence</p>

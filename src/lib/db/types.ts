@@ -498,6 +498,30 @@ export interface Coupon {
   active: boolean;
 }
 
+/* ----------------------------- Blog posts -------------------------- */
+
+export interface BlogPostSection {
+  heading: string;
+  paragraphs: string[];
+  list?: string[];
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  cover: string; // "/images/gallery-N.svg"
+  author: string;
+  authorRole: string;
+  category: string;
+  tags: string[];
+  readTimeMin: number;
+  publishedAt: string;
+  featured?: boolean;
+  sections: BlogPostSection[];
+}
+
 /* ------------------------------ Reviews ---------------------------- */
 
 export interface Review {
@@ -657,6 +681,7 @@ export interface DB {
   tickets: Ticket[];
   coupons: Coupon[];
   reviews: Review[];
+  blogPosts: BlogPost[];
   referrals: Referral[];
   achievements: Achievement[];
   challenges: Challenge[];

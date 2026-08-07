@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   LayoutDashboard, CalendarDays, TrendingUp, Salad, Bell, LifeBuoy, Trophy, Flame,
   QrCode, CheckCircle2, Zap, Target, Clock, MapPin, MessageSquarePlus, ArrowRight,
-  Dumbbell, Receipt, Printer, Loader2, IndianRupee,
+  Dumbbell, Receipt, Printer, Loader2, IndianRupee, UserPlus, Copy, Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/client";
@@ -25,6 +25,7 @@ type P = {
   notifications: { id: string; title: string; body: string; link?: string; read: boolean; createdAt: string }[];
   tickets: { id: string; subject: string; status: string; priority: string; updatedAt?: string; replyCount: number }[];
   achievements: { id: string; title: string; badge: string; unlockedAt: string }[];
+  referrals: { code: string | null; uses: number; rewardPoints: number; totalRewarded: number; referredByName: string | null; discountPct: number; referralCount: number };
   bookings: { id: string; ref: string; type: string; date: string; time: string; durationMin: number; status: string; class?: string; trainer?: string }[];
   checkedInToday: boolean;
   branchName?: string;
@@ -45,6 +46,7 @@ const TABS = [
   { key: "payments", label: "Payments", icon: IndianRupee },
   { key: "notifications", label: "Alerts", icon: Bell },
   { key: "tickets", label: "Support", icon: LifeBuoy },
+  { key: "referrals", label: "Referrals", icon: UserPlus },
   { key: "achievements", label: "Achievements", icon: Trophy },
 ] as const;
 
@@ -258,7 +260,10 @@ export function MemberPortal(p: P) {
         )}
 
         {tab === "training" && (
-          <PtBookingPanel trainers={p.ptTrainers} sessions={p.ptSessions} bookings={p.bookings} push={push} />
+          <div className="space-y-6">
+            <WorkoutLogForm push={push} />
+            <PtBookingPanel trainers={p.ptTrainers} sessions={p.ptSessions} bookings={p.bookings} push={push} />
+          </div>
         )}
 
         {tab === "payments" && (
@@ -370,6 +375,10 @@ export function MemberPortal(p: P) {
           <TicketPanel tickets={p.tickets} push={push} />
         )}
 
+        {tab === "referrals" && (
+          <ReferralPanel referrals={p.referrals} push={push} />
+        )}
+
         {tab === "achievements" && (
           <div className="space-y-6">
             <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Achievements</h2>
@@ -395,11 +404,184 @@ export function MemberPortal(p: P) {
             <CheckCircle2 className="mx-auto size-12 text-volt-500" />
             <h3 className="font-display mt-3 text-xl font-extrabold text-ink-900 dark:text-ink-700">You&apos;re checked in!</h3>
             <p className="mt-1 text-sm text-ink-400">Show this code at the turnstile or save it for future check-ins.</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qr} alt="Member QR code" className="mx-auto mt-5 w-44 rounded-2xl bg-white p-3" />
             <p className="mt-3 font-mono text-xs text-ink-400">{p.user.memberId}</p>
             <Button className="mt-5 w-full" onClick={() => setQr(null)}>Done</Button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function WorkoutLogForm({ push }: { push: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [durationMin, setDurationMin] = React.useState(45);
+  const [calories, setCalories] = React.useState("");
+  const [exercises, setExercises] = React.useState([{ name: "", sets: 3, reps: "10", weight: "" }]);
+  const [busy, setBusy] = React.useState(false);
+
+  const setEx = (i: number, patch: Partial<{ name: string; sets: number; reps: string; weight: string }>) =>
+    setExercises((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const filled = exercises.filter((x) => x.name.trim());
+    setBusy(true);
+    const res = await fetch("/api/portal/workout-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        durationMin,
+        caloriesBurned: Number(calories) || 0,
+        exercises: filled.map((x) => ({ name: x.name, sets: x.sets, reps: x.reps, weightKg: Number(x.weight) || undefined })),
+      }),
+    });
+    const json = await res.json();
+    setBusy(false);
+    if (!res.ok) return push(json.error || "Could not log workout", "error");
+    const bonus = json.newAchievements?.length ? ` · ${json.newAchievements.join(", ")} unlocked!` : "";
+    push(`Workout logged (+${json.xp} XP)${bonus}`);
+    setTimeout(() => window.location.reload(), 900);
+  };
+
+  return (
+    <form onSubmit={submit} className="card-shadow rounded-3xl border border-ink-100 bg-card p-6 dark:border-ink-100">
+      <div className="flex items-center gap-2">
+        <Flame className="size-5 text-volt-500" />
+        <h3 className="font-display text-lg font-extrabold text-ink-900 dark:text-ink-700">Log a workout</h3>
+        <span className="text-xs text-ink-400">2 XP per minute</span>
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <label>
+          <span className="mb-1.5 block text-xs font-semibold text-ink-500">Duration (minutes)</span>
+          <input type="number" min={1} max={240} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))}
+            className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none" />
+        </label>
+        <label>
+          <span className="mb-1.5 block text-xs font-semibold text-ink-500">Calories burned (optional)</span>
+          <input type="number" min={0} value={calories} onChange={(e) => setCalories(e.target.value)} placeholder={`≈ ${Math.round((durationMin || 45) * 8)} kcal`}
+            className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none" />
+        </label>
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-xs font-semibold text-ink-500">Exercises</span>
+          <button type="button" onClick={() => setExercises((xs) => [...xs, { name: "", sets: 3, reps: "10", weight: "" }])}
+            className="text-xs font-bold text-volt-600 hover:underline dark:text-volt-400">+ Add exercise</button>
+        </div>
+        <div className="space-y-2">
+          {exercises.map((ex, i) => (
+            <div key={i} className="grid grid-cols-[1fr_3.5rem_4rem_5rem_2rem] items-center gap-2">
+              <input value={ex.name} onChange={(e) => setEx(i, { name: e.target.value })} placeholder={`Exercise ${i + 1} name`}
+                className="rounded-xl border border-ink-200 bg-paper px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:outline-none" />
+              <input type="number" min={1} value={ex.sets} onChange={(e) => setEx(i, { sets: Number(e.target.value) })} title="Sets"
+                className="w-full rounded-xl border border-ink-200 bg-paper px-2 py-2 text-center text-sm text-ink-900 focus:border-volt-500 focus:outline-none" />
+              <input value={ex.reps} onChange={(e) => setEx(i, { reps: e.target.value })} placeholder="Reps" title="Reps"
+                className="w-full rounded-xl border border-ink-200 bg-paper px-2 py-2 text-center text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:outline-none" />
+              <input value={ex.weight} onChange={(e) => setEx(i, { weight: e.target.value })} placeholder="kg" title="Weight kg"
+                className="w-full rounded-xl border border-ink-200 bg-paper px-2 py-2 text-center text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:outline-none" />
+              <button type="button" onClick={() => setExercises((xs) => xs.filter((_, j) => j !== i))} disabled={exercises.length === 1}
+                className="text-sm text-stop-500 disabled:opacity-30" aria-label="Remove exercise">✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <Button type="submit" disabled={busy}><Dumbbell className="size-4" /> {busy ? "Logging…" : "Log workout"}</Button>
+      </div>
+    </form>
+  );
+}
+
+function ReferralPanel({ referrals, push }: { referrals: P["referrals"]; push: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [code, setCode] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const link = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referrals.code ?? ""}` : "";
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(referrals.code ?? "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* ignore */ }
+  };
+
+  const apply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    const res = await fetch("/api/portal/referrals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+    const json = await res.json();
+    setBusy(false);
+    if (!res.ok) return push(json.error || "Could not apply code", "error");
+    push("Referral applied! 🎉");
+    setTimeout(() => window.location.reload(), 900);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="card-shadow rounded-3xl border border-ink-100 bg-night-950 p-6 text-white dark:border-ink-100">
+        <div className="flex items-center gap-2">
+          <UserPlus className="size-5 text-volt-400" />
+          <h2 className="font-display text-xl font-extrabold">Invite friends, get rewarded</h2>
+        </div>
+        <p className="mt-2 max-w-xl text-sm text-white/60">
+          Share your code. When a friend joins, you earn <span className="font-bold text-volt-400">200 reward points</span> and they get
+          <span className="font-bold text-volt-400"> {referrals.discountPct}% off</span> their next renewal.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <code className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 font-mono text-lg font-extrabold tracking-widest text-volt-400">
+            {referrals.code ?? "—"}
+          </code>
+          <Button className="bg-volt-500 text-ink-900 hover:bg-volt-400" onClick={copy}>
+            <Copy className="size-4" /> {copied ? "Copied!" : "Copy code"}
+          </Button>
+          <Button variant="outline" className="border-white/20 text-white hover:bg-white/10" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Join me at NEXTGEN Fitness! Use my code ${referrals.code} for ${referrals.discountPct}% off your next renewal.`)}`, "_blank")}>
+            <Share2 className="size-4" /> Share on WhatsApp
+          </Button>
+        </div>
+        <p className="mt-4 font-mono text-xs text-white/40">{link}</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
+          <p className="text-3xl font-extrabold text-ink-900 dark:text-ink-700">{referrals.referralCount}</p>
+          <p className="mt-1 text-xs text-ink-400">Friends referred</p>
+        </div>
+        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
+          <p className="text-3xl font-extrabold text-volt-600 dark:text-volt-400">{referrals.rewardPoints}</p>
+          <p className="mt-1 text-xs text-ink-400">Reward points earned</p>
+        </div>
+        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
+          <p className="text-3xl font-extrabold text-gold-500">{referrals.uses}</p>
+          <p className="mt-1 text-xs text-ink-400">Total code uses</p>
+        </div>
+      </div>
+
+      {referrals.referredByName ? (
+        <p className="rounded-2xl border border-volt-500/25 bg-volt-500/5 p-4 text-sm text-ink-600 dark:text-ink-400">
+          You joined on a referral from <span className="font-bold text-ink-900 dark:text-ink-700">{referrals.referredByName}</span> — your {referrals.discountPct}% renewal discount is active.
+        </p>
+      ) : (
+        <form onSubmit={apply} className="card-shadow rounded-3xl border border-ink-100 bg-card p-6 dark:border-ink-100">
+          <p className="text-sm font-bold text-ink-900 dark:text-ink-700">Had a friend at NEXTGEN? Enter their code</p>
+          <p className="mt-1 text-xs text-ink-400">You&apos;ll both get rewarded — and you&apos;ll get {referrals.discountPct}% off your next renewal.</p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="min-w-48 flex-1">
+              <span className="mb-1.5 block text-xs font-semibold text-ink-500">Referral code</span>
+              <input
+                value={code} onChange={(e) => setCode(e.target.value)}
+                placeholder="e.g. NF001"
+                className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 font-mono text-sm uppercase text-ink-900 placeholder:normal-case placeholder:text-ink-400 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none"
+              />
+            </label>
+            <Button type="submit" disabled={busy || !code.trim()}><ArrowRight className="size-4" /> {busy ? "Applying…" : "Apply code"}</Button>
+          </div>
+        </form>
       )}
     </div>
   );

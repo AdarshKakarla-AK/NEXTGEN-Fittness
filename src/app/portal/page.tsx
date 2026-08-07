@@ -88,6 +88,10 @@ export default async function PortalPage() {
 
   const achievements = db.achievements.filter((a) => a.memberId === memberId);
 
+  const myReferral = db.referrals.find((r) => r.ownerId === memberId);
+  const referredCount = db.users.filter((u) => u.referredBy === memberId).length;
+  const referredBy = user.referredBy ? db.users.find((u) => u.id === user.referredBy) : undefined;
+
   const todayISO = new Date().toISOString().slice(0, 10);
   const checkedInToday = db.attendance.some((a) => a.memberId === memberId && a.date === todayISO);
 
@@ -160,6 +164,15 @@ export default async function PortalPage() {
       notifications={notifications.slice(0, 12).map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, read: n.read, createdAt: n.createdAt }))}
       tickets={tickets.slice(0, 6).map((t) => ({ id: t.id, subject: t.subject, status: t.status, priority: t.priority, updatedAt: t.updatedAt, replyCount: t.replies.length }))}
       achievements={achievements.slice(0, 9).map((a) => ({ id: a.id, title: a.title, badge: a.badge, unlockedAt: a.unlockedAt }))}
+      referrals={{
+        code: user.referralCode ?? myReferral?.code ?? null,
+        uses: myReferral?.uses ?? 0,
+        rewardPoints: myReferral?.rewardPoints ?? 0,
+        totalRewarded: myReferral?.totalRewarded ?? 0,
+        referredByName: referredBy?.name ?? null,
+        discountPct: db.settings.referralDiscountPct,
+        referralCount: referredCount,
+      }}
       bookings={bookingRows}
       checkedInToday={checkedInToday}
       branchName={db.settings.branches[0]?.name}

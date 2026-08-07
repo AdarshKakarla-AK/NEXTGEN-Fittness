@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Hammer, ArrowRight, Bell } from "lucide-react";
 import { PageHero } from "@/components/site/PageHero";
 import { Input, Button } from "@/components/ui";
@@ -74,7 +75,7 @@ export function ComingSoon({
             <div className="grid content-start gap-4">
               {preview.map((p, i) => (
                 <div key={p} className="card-shadow flex items-center gap-4 rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
-                  <img src={`/images/gallery-${(i % 8) + 1}.svg`} alt="" className="h-16 w-24 rounded-xl object-cover" loading="lazy" />
+                  <div className="relative h-16 w-24 shrink-0"><Image src={`/images/gallery-${(i % 8) + 1}.svg`} alt="" fill sizes="96px" className="rounded-xl object-cover" loading="lazy" /></div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{p}</p>
                     <p className="text-xs text-ink-400">Preview · launching soon</p>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import {
   ArrowRight, Activity, Apple, BarChart3, CalendarCheck, Dumbbell, Flame, HeartPulse, QrCode,
@@ -112,7 +113,7 @@ export default function HomePage() {
 
               <div className="card-shadow-lg overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-night-800 to-night-900">
                 <div className="bg-grid-dark relative h-80">
-                  <img src="/images/hero-gym.svg" alt="Inside NEXTGEN FITNESS" className="h-full w-full object-cover opacity-80" loading="eager" />
+                  <Image src="/images/hero-gym.svg" alt="Inside NEXTGEN FITNESS" fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover opacity-80" />
                   <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold backdrop-blur">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-volt-500" /> LIVE · 34 training now
                   </span>

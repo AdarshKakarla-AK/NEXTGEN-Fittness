@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["bcryptjs", "qrcode"],
   poweredByHeader: false,
+  images: {
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    remotePatterns: [],
+  },
   async headers() {
     return [
       {
@@ -23,7 +28,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
               "connect-src 'self' https:",
-              "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://www.google.com",
+              "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://www.google.com https://www.youtube-nocookie.com",
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",

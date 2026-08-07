@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { BellRing, Boxes, CalendarCheck, PhoneCall, Ticket, UserCheck, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BellRing, Boxes, CalendarCheck, LogIn, LogOut, PhoneCall, Search, Ticket, UserCheck, Users } from "lucide-react";
 import { Card, Badge, Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -47,8 +48,116 @@ function KpiCard({ icon, label, value, sub, tone = "green" }: { icon: React.Reac
 
 const avatarColors = ["#22c55e", "#3385ff", "#f97316", "#a855f7", "#14b8a6", "#eab308", "#ef4444", "#6366f1"];
 
+type SearchMember = {
+  id: string; name: string; phone: string; memberId?: string;
+  membershipStatus: string; planName: string | null;
+  checkedIn: boolean; checkInTime: string | null; checkOutTime: string | null;
+  avatarColor?: string;
+};
+
+function MemberSearchPanel({ onChanged }: { onChanged: () => void }) {
+  const [q, setQ] = React.useState("");
+  const [members, setMembers] = React.useState<SearchMember[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [minutes, setMinutes] = React.useState<Record<string, number>>({});
+  const [error, setError] = React.useState("");
+  const [notice, setNotice] = React.useState("");
+
+  React.useEffect(() => {
+    const t = setTimeout(async () => {
+      if (q.trim().length < 2) { setMembers([]); return; }
+      setLoading(true); setError("");
+      try {
+        const r = await fetch(`/api/receptionist/checkin?q=${encodeURIComponent(q)}`);
+        if (!r.ok) throw new Error("Search failed");
+        const d = await r.json();
+        setMembers(d.members ?? []);
+      } catch { setError("Could not search members."); }
+      finally { setLoading(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  async function act(m: SearchMember, action: "checkin" | "checkout") {
+    setBusy(m.id); setError(""); setNotice("");
+    try {
+      const r = await fetch("/api/receptionist/checkin", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, memberId: m.id, workoutMinutes: minutes[m.id] }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Request failed");
+      setNotice(action === "checkin" ? `${m.name} checked in (+15 XP)` : `${m.name} checked out`);
+      setQ(""); setMembers([]); setMinutes({});
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally { setBusy(null); }
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Member check-in</h2>
+        <Badge tone="blue">Front desk</Badge>
+      </div>
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name, phone, member ID or email…"
+          className="w-full rounded-xl border border-ink-100 bg-card py-3 pl-10 pr-4 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 dark:border-ink-100 dark:text-ink-700"
+        />
+      </div>
+      {loading && <p className="mt-3 text-sm text-ink-400">Searching…</p>}
+      {error && <p className="mt-3 text-sm font-semibold text-stop-500">{error}</p>}
+      {notice && <p className="mt-3 text-sm font-semibold text-volt-600 dark:text-volt-400">{notice}</p>}
+      {members.length > 0 && (
+        <div className="mt-4 space-y-2.5">
+          {members.map((m) => (
+            <div key={m.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-ink-100 p-3 dark:border-ink-100">
+              <Avatar name={m.name} className="size-9 text-xs" color={m.avatarColor ?? avatarColors[0]} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-ink-900 dark:text-ink-700">{m.name}</p>
+                <p className="text-xs text-ink-400">{m.phone} · {m.memberId ?? m.id}</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Badge tone={m.membershipStatus === "active" ? "green" : "red"} className="capitalize">{m.membershipStatus}</Badge>
+                {m.planName && <Badge tone="gray">{m.planName}</Badge>}
+              </div>
+              {m.checkedIn && !m.checkOutTime ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} value={minutes[m.id] ?? ""} onChange={(e) => setMinutes((p) => ({ ...p, [m.id]: Number(e.target.value) }))}
+                    placeholder="mins" className="w-20 rounded-lg border border-ink-100 bg-card px-2.5 py-1.5 text-sm outline-none dark:border-ink-100"
+                  />
+                  <button onClick={() => act(m, "checkout")} disabled={busy === m.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-stop-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-stop-600 disabled:opacity-50">
+                    <LogOut className="size-3.5" /> Check out
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => act(m, "checkin")} disabled={busy === m.id || m.membershipStatus !== "active"}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-volt-500 px-3 py-1.5 text-xs font-bold text-ink-900 transition hover:bg-volt-400 disabled:opacity-50">
+                  <LogIn className="size-3.5" /> Check in
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {q.trim().length >= 2 && members.length === 0 && !loading && (
+        <p className="mt-4 py-4 text-center text-sm text-ink-400">No members match “{q}”.</p>
+      )}
+    </Card>
+  );
+}
+
 export function ReceptionistDashboard({ name, kpis, todaysAttendance, leads, expiring, upcomingToday, tickets, lowStock }: ReceptionistProps) {
   const [tab, setTab] = React.useState<"desk" | "leads" | "expiring" | "tickets" | "stock">("desk");
+  const router = useRouter();
   const todayLabel = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   const tabs = [
@@ -81,6 +190,8 @@ export function ReceptionistDashboard({ name, kpis, todaysAttendance, leads, exp
 
       {tab === "desk" && (
         <>
+          <MemberSearchPanel onChanged={() => router.refresh()} />
+
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
             <KpiCard icon={<UserCheck className="size-5" />} label="Members inside" value={kpis.membersPresent} tone="green" />
             <KpiCard icon={<CalendarCheck className="size-5" />} label="Check-ins today" value={kpis.todaysCheckins} tone="blue" />

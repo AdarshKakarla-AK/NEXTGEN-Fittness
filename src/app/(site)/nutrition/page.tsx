@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Apple, Salad, UtensilsCrossed, Droplets, ChartNoAxesCombined } from "lucide-react";
 import { PageHero, CTAStrip, FinalCTA } from "@/components/site/PageHero";
 import { FAQSection } from "@/components/site/FAQ";
@@ -79,7 +80,7 @@ export default function NutritionPage() {
               </div>
             </div>
             <div className="card-shadow overflow-hidden rounded-3xl border border-ink-100 bg-paper dark:border-ink-100">
-              <img src="/images/class-yoga.svg" alt="Healthy meal prep" className="h-60 w-full object-cover" loading="lazy" />
+              <div className="relative h-60 w-full"><Image src="/images/class-yoga.svg" alt="Healthy meal prep" fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" /></div>
               <div className="p-8">
                 <h3 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Nutrition tracks</h3>
                 <div className="mt-5 space-y-4">
