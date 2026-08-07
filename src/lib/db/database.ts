@@ -14,7 +14,7 @@ export interface DatabaseHandle {
 
 // Bump SCHEMA_VERSION when a migration below is added. Migrations run in order
 // on boot against any database that predates the current version.
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // Backfill the blogPosts collection for databases that predate it. Repeating
 // the backfill across versions keeps it idempotent and aligned to the index
@@ -29,11 +29,21 @@ const backfillExpenses = (db: DB) => {
   db.expenses = buildSeed().expenses;
 };
 
+const backfillDailyReminder = (db: DB) => {
+  const s = db.settings;
+  if (s.dailyReminderEnabled === undefined) {
+    s.dailyReminderEnabled = true;
+    s.dailyReminderTime = "09:00";
+    s.dailyReminderMessage = "Good morning from NEXTGEN FITNESS! Daily reminder — hydrate, move and make today count. See you at the club!";
+  }
+};
+
 export const MIGRATIONS: ((db: DB) => void)[] = [
   backfillBlogPosts, // 0: v0 -> v1
   backfillBlogPosts, // 1: v1 -> v2
   backfillBlogPosts, // 2: v2 -> v3
   backfillExpenses, // 3: v3 -> v4
+  backfillDailyReminder, // 4: v4 -> v5
 ];
 
 const ARRAY_COLLECTIONS: (keyof DB)[] = [

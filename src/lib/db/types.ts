@@ -614,7 +614,8 @@ export type AutomationType =
   | "offer"
   | "review_request"
   | "otp"
-  | "welcome_whatsapp";
+  | "welcome_whatsapp"
+  | "daily_reminder";
 
 export interface AutomationLog {
   id: string;
@@ -663,6 +664,11 @@ export interface Settings {
   referralDiscountPct: number;
   demoMode: boolean;
   demoAnchor: string; // seed date, used to roll demo data forward
+  // daily WhatsApp reminder automation (all active members)
+  dailyReminderEnabled?: boolean;
+  dailyReminderTime?: string; // "HH:MM" 24h
+  dailyReminderMessage?: string;
+  dailyReminderLastSent?: string; // ISO timestamp of last batch dispatch
 }
 
 /* ------------------------------- DB -------------------------------- */

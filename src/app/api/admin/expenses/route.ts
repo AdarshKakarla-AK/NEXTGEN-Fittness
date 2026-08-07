@@ -34,6 +34,32 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireUser(["admin"]);
     const body = await req.json().catch(() => ({}));
+    const action = String(body.action ?? "add");
+
+    if (action === "update") {
+      const id = String(body.id ?? "");
+      const description = String(body.description ?? "").trim();
+      if (description.length < 2) return NextResponse.json({ error: "Enter a description." }, { status: 400 });
+      const category: ExpenseCategory = CATEGORIES.includes(body.category) ? body.category : "misc";
+      const amount = Math.max(1, Number(body.amount) || 0);
+      if (!amount) return NextResponse.json({ error: "Enter a valid amount." }, { status: 400 });
+      const date = String(body.date ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+
+      let found = false;
+      mutate((d) => {
+        const exp = d.expenses.find((e) => e.id === id);
+        if (!exp) return;
+        found = true;
+        exp.description = description;
+        exp.category = category;
+        exp.amount = amount;
+        exp.date = date;
+        audit(d, user.id, user.name, "expense.update", description, JSON.stringify({ category, amount, date }));
+      });
+      if (!found) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
+      return NextResponse.json({ ok: true });
+    }
+
     const description = String(body.description ?? "").trim();
     if (description.length < 2) return NextResponse.json({ error: "Enter a description." }, { status: 400 });
     const category: ExpenseCategory = CATEGORIES.includes(body.category) ? body.category : "misc";
@@ -48,6 +74,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error && e.message === "UNAUTHORIZED" ? "Please sign in first." : "Could not add the expense." }, { status: 401 });
+    return NextResponse.json({ error: e instanceof Error && e.message === "UNAUTHORIZED" ? "Please sign in first." : "Could not update the expense." }, { status: 401 });
   }
 }

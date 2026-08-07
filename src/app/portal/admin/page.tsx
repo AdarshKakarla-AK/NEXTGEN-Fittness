@@ -42,6 +42,15 @@ export default async function AdminPage() {
     .filter((e) => e.date.slice(0, 7) === today.slice(0, 7))
     .reduce((s, e) => s + e.amount, 0);
 
+  const s = db.settings;
+  const dailyReminder = {
+    enabled: !!s.dailyReminderEnabled,
+    time: s.dailyReminderTime ?? "09:00",
+    message: s.dailyReminderMessage ?? "Good morning from NEXTGEN FITNESS! Daily reminder — hydrate, move and make today count. See you at the club!",
+    lastSentAt: s.dailyReminderLastSent ?? null,
+    memberCount: db.users.filter((u) => u.role === "member" && u.active && !!u.phone).length,
+  };
+
   return (
     <AdminDashboard
       name={user.name}
@@ -94,6 +103,7 @@ export default async function AdminPage() {
       }))}
       expenses={expenses}
       monthlyExpenses={monthlyExpenses}
+      dailyReminder={dailyReminder}
     />
   );
 }

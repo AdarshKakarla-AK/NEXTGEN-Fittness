@@ -910,6 +910,8 @@ export function buildSeed(): DB {
       { id: "br_hsr", name: "HSR Layout", address: "27th Main, Sector 1, HSR", phone: "+91 98765 43212", city: "Bengaluru" },
     ],
     referralDiscountPct: 10, demoMode: true, demoAnchor: iso(new Date()),
+    dailyReminderEnabled: true, dailyReminderTime: "09:00",
+    dailyReminderMessage: "Good morning from NEXTGEN FITNESS! Daily reminder — hydrate, move and make today count. See you at the club!",
   };
 
   return {

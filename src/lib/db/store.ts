@@ -32,6 +32,27 @@ try {
   /* best-effort date roll */
 }
 
+// Automated daily WhatsApp reminder. Runs on boot (once per day) once the
+// module graph is fully resolved — imported dynamically to avoid a static
+// import cycle with the automation/notify modules.
+if (typeof setImmediate === "function") {
+  setImmediate(() => {
+    import("@/lib/automation")
+      .then(({ runDailyReminderIfDue }) => {
+        try {
+          handle.mutate((d) => {
+            runDailyReminderIfDue(d);
+          });
+        } catch {
+          /* best-effort automation */
+        }
+      })
+      .catch(() => {
+        /* best-effort automation */
+      });
+  });
+}
+
 export function getDB(): DB {
   return handle.get();
 }

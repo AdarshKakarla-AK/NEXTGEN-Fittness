@@ -39,12 +39,13 @@ type AdminProps = {
   funnel: { status: string; value: number }[];
   leadSource: { source: string; value: number }[];
   planDist: { name: string; value: number }[];
-  trainers: { id: string; name: string; specialization: string; rating: number; reviewCount: number; upcoming: number; completed: number; revenue: number; utilization: number }[];
+  trainers: { id: string; name: string; specialization: string; rating: number; reviewCount: number; upcoming: number; completed: number; revenue: number; utilization: number; specializations: string[]; languages: string[]; bio: string; phone: string; email: string; hourlyRate: number; yearsExp: number; active: boolean }[];
   payments: { id: string; ref: string; description: string; amount: number; method: string; status: string; createdAt: string; member: string; invoiceNo?: string }[];
   recentAudit: { id: string; action: string; actor: string; meta?: string; createdAt: string }[];
   equipment: { id: string; name: string; category: string; status: EquipmentStatus; usageHours: number; lastMaintenance: string | null; nextMaintenance: string | null; warrantyExpiry: string | null; amcProvider: string | null; notes: string | null }[];
   expenses: { id: string; category: string; description: string; amount: number; date: string }[];
   monthlyExpenses: number;
+  dailyReminder: { enabled: boolean; time: string; message: string; lastSentAt: string | null; memberCount: number };
 };
 
 function KpiCard({ icon, label, value, sub, delta, tone = "green" }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: string; delta?: number; tone?: "green" | "blue" | "gold" | "red" | "orange" }) {
@@ -75,11 +76,20 @@ function KpiCard({ icon, label, value, sub, delta, tone = "green" }: { icon: Rea
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-function RemindersPanel() {
+function RemindersPanel({ initialDaily }: { initialDaily: AdminProps["dailyReminder"] }) {
   const [bookings, setBookings] = React.useState<{ id: string; ref: string; member: string; phone: string; type: string; time: string; class: string; reminded: boolean }[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
+  const [daily, setDaily] = React.useState(initialDaily);
+  const [dailyForm, setDailyForm] = React.useState({ enabled: initialDaily.enabled, time: initialDaily.time, message: initialDaily.message });
+  const [savingDaily, setSavingDaily] = React.useState(false);
+  const [sendingDaily, setSendingDaily] = React.useState(false);
+
+  const applyDaily = (d: { enabled?: boolean; time?: string; message?: string; lastSentAt?: string | null; memberCount?: number }) => {
+    setDaily({ enabled: !!d.enabled, time: d.time ?? "09:00", message: d.message ?? "", lastSentAt: d.lastSentAt ?? null, memberCount: d.memberCount ?? 0 });
+    setDailyForm({ enabled: !!d.enabled, time: d.time ?? "09:00", message: d.message ?? "" });
+  };
 
   const load = async () => {
     setBusy(true);
@@ -94,6 +104,28 @@ function RemindersPanel() {
       setLoaded(true);
     }
   };
+
+  const loadDaily = async () => {
+    const res = await fetch("/api/admin/daily-reminders");
+    if (res.ok) applyDaily(await res.json());
+  };
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      const [bookRes, dailyRes] = await Promise.all([fetch("/api/admin/reminders"), fetch("/api/admin/daily-reminders")]);
+      if (!active) return;
+      if (bookRes.ok) {
+        const d = await bookRes.json();
+        setBookings(d.bookings ?? []);
+      }
+      if (dailyRes.ok) applyDaily(await dailyRes.json());
+      setLoaded(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const send = async () => {
     setSending(true);
@@ -110,40 +142,118 @@ function RemindersPanel() {
     }
   };
 
+  const saveDaily = async () => {
+    setSavingDaily(true);
+    try {
+      const res = await fetch("/api/admin/daily-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "settings", ...dailyForm }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Could not save.");
+      await loadDaily();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not save settings.");
+    } finally {
+      setSavingDaily(false);
+    }
+  };
+
+  const sendDaily = async () => {
+    setSendingDaily(true);
+    try {
+      const res = await fetch("/api/admin/daily-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send" }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Failed");
+      setDaily((prev) => ({ ...prev, lastSentAt: new Date().toISOString() }));
+      alert(`Daily reminder sent to ${d.sent} member(s) via WhatsApp.`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to send");
+    } finally {
+      setSendingDaily(false);
+    }
+  };
+
   return (
-    <Card className="p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Class reminders — tomorrow</h2>
-          <p className="mt-0.5 text-sm text-ink-400">WhatsApp nudges for tomorrow&apos;s bookings. Sent once per booking.</p>
+    <>
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Class reminders — tomorrow</h2>
+            <p className="mt-0.5 text-sm text-ink-400">WhatsApp nudges for tomorrow&apos;s bookings. Sent once per booking.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={load} disabled={busy} className="rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-bold text-ink-500 transition hover:bg-ink-100 dark:border-ink-100">
+              {busy ? "Loading…" : "Refresh"}
+            </button>
+            <Button onClick={send} disabled={sending || busy || bookings.filter((b) => !b.reminded).length === 0}>
+              {sending ? "Sending…" : `Send ${bookings.filter((b) => !b.reminded).length} reminder(s)`}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} disabled={busy} className="rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-bold text-ink-500 transition hover:bg-ink-100 dark:border-ink-100">
-            {busy ? "Loading…" : "Refresh"}
-          </button>
-          <Button onClick={send} disabled={sending || busy || bookings.filter((b) => !b.reminded).length === 0}>
-            {sending ? "Sending…" : `Send ${bookings.filter((b) => !b.reminded).length} reminder(s)`}
-          </Button>
-        </div>
-      </div>
-      {loaded && bookings.length === 0 && (
-        <p className="mt-4 rounded-xl bg-ink-50 p-4 text-center text-sm text-ink-400 dark:bg-ink-100">No bookings scheduled for tomorrow.</p>
-      )}
-      {bookings.length > 0 && (
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {bookings.map((b) => (
-            <div key={b.id} className={cn("rounded-xl border p-3.5", b.reminded ? "border-ink-100 bg-ink-50/60 dark:border-ink-100 dark:bg-ink-100" : "border-ink-100 dark:border-ink-100")}>
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-sm font-bold text-ink-900 dark:text-ink-700">{b.member}</p>
-                <Badge tone={b.reminded ? "green" : "orange"}>{b.reminded ? "Reminded" : "Pending"}</Badge>
+        {loaded && bookings.length === 0 && (
+          <p className="mt-4 rounded-xl bg-ink-50 p-4 text-center text-sm text-ink-400 dark:bg-ink-100">No bookings scheduled for tomorrow.</p>
+        )}
+        {bookings.length > 0 && (
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {bookings.map((b) => (
+              <div key={b.id} className={cn("rounded-xl border p-3.5", b.reminded ? "border-ink-100 bg-ink-50/60 dark:border-ink-100 dark:bg-ink-100" : "border-ink-100 dark:border-ink-100")}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-bold text-ink-900 dark:text-ink-700">{b.member}</p>
+                  <Badge tone={b.reminded ? "green" : "orange"}>{b.reminded ? "Reminded" : "Pending"}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-ink-400">{b.class} · {b.time} · {b.ref}</p>
+                <p className="mt-1 text-xs text-ink-400">{b.phone}</p>
               </div>
-              <p className="mt-1 text-xs text-ink-400">{b.class} · {b.time} · {b.ref}</p>
-              <p className="mt-1 text-xs text-ink-400">{b.phone}</p>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Daily WhatsApp reminder — all clients</h2>
+            <p className="mt-0.5 text-sm text-ink-400">Automated nudge sent to every active member via WhatsApp, once a day.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => void loadDaily()} disabled={savingDaily} className="rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-bold text-ink-500 transition hover:bg-ink-100 dark:border-ink-100">
+              Refresh
+            </button>
+            <Button onClick={() => void sendDaily()} disabled={sendingDaily || !daily.enabled}>{sendingDaily ? "Sending…" : "Send now"}</Button>
+          </div>
         </div>
-      )}
-    </Card>
+
+        <form onSubmit={(e) => { e.preventDefault(); void saveDaily(); }} className="mt-4 grid gap-3 rounded-2xl border border-ink-100 bg-paper p-4 sm:grid-cols-2 lg:grid-cols-4 dark:border-ink-100">
+          <label className="flex items-center gap-2 self-end rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm font-semibold text-ink-700">
+            <input type="checkbox" checked={dailyForm.enabled} onChange={(e) => setDailyForm((f) => ({ ...f, enabled: e.target.checked }))} className="size-4 accent-volt-500" />
+            Automation on
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-semibold text-ink-500">Send time</span>
+            <input type="time" value={dailyForm.time} onChange={(e) => setDailyForm((f) => ({ ...f, time: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+          </label>
+          <label className="sm:col-span-2">
+            <span className="mb-1 block text-xs font-semibold text-ink-500">Message</span>
+            <textarea value={dailyForm.message} onChange={(e) => setDailyForm((f) => ({ ...f, message: e.target.value }))} rows={2} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+          </label>
+          <div className="flex items-end">
+            <Button type="submit" className="w-full" disabled={savingDaily}>{savingDaily ? "Saving…" : "Save settings"}</Button>
+          </div>
+        </form>
+
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-xs text-ink-400">
+          <span>Recipients: <b className="text-ink-700">{daily.memberCount} active members</b></span>
+          <span>Status: <b className={cn(daily.enabled ? "text-volt-600 dark:text-volt-400" : "text-ink-500")}>{daily.enabled ? `Automation ON — fires daily at ${daily.time}` : "Automation OFF"}</b></span>
+          <span>Last sent: <b className="text-ink-700">{daily.lastSentAt ? new Date(daily.lastSentAt).toLocaleString("en-IN") : "Never"}</b></span>
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -316,6 +426,9 @@ function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses 
   const [monthly, setMonthly] = React.useState(initialMonthlyExpenses);
   const [busy, setBusy] = React.useState(false);
   const [form, setForm] = React.useState({ description: "", category: "misc" as ExpenseCategory, amount: "", date: "" });
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [editForm, setEditForm] = React.useState({ description: "", category: "misc" as ExpenseCategory, amount: "", date: "" });
+  const [savingEdit, setSavingEdit] = React.useState(false);
 
   const refresh = async () => {
     const res = await fetch("/api/admin/expenses");
@@ -343,6 +456,31 @@ function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses 
       await refresh();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const startEdit = (e: (typeof expenses)[number]) => {
+    setEditForm({ description: e.description, category: e.category as ExpenseCategory, amount: String(e.amount), date: e.date });
+    setEditId(e.id);
+  };
+
+  const saveEdit = async () => {
+    if (!editId) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/admin/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id: editId, ...editForm, amount: Number(editForm.amount) || 0 }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Could not save the expense.");
+      setEditId(null);
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not save the expense.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -420,26 +558,59 @@ function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses 
           <Badge tone="gray">{monthlyRows.length} entries</Badge>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead>
               <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-400 dark:border-ink-100">
                 <th className="pb-2.5 pr-4 font-semibold">Date</th>
                 <th className="pb-2.5 pr-4 font-semibold">Description</th>
                 <th className="pb-2.5 pr-4 font-semibold">Category</th>
-                <th className="pb-2.5 text-right font-semibold">Amount</th>
+                <th className="pb-2.5 pr-4 text-right font-semibold">Amount</th>
+                <th className="pb-2.5 text-right font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {monthlyRows.map((e) => (
-                <tr key={e.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
-                  <td className="py-3 pr-4 text-ink-400">{e.date.slice(5)}</td>
-                  <td className="py-3 pr-4 font-semibold text-ink-700">{e.description}</td>
-                  <td className="py-3 pr-4"><Badge tone="gray" className="capitalize">{e.category}</Badge></td>
-                  <td className="py-3 text-right font-bold text-ink-700">{inr(e.amount)}</td>
-                </tr>
-              ))}
+              {monthlyRows.map((e) =>
+                editId === e.id ? (
+                  <tr key={e.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
+                    <td className="py-3 pr-4">
+                      <input type="date" value={editForm.date} onChange={(ev) => setEditForm((f) => ({ ...f, date: ev.target.value }))} className="w-full rounded-lg border border-ink-200 bg-paper px-2 py-1.5 text-sm outline-none focus:border-volt-500" />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <input value={editForm.description} onChange={(ev) => setEditForm((f) => ({ ...f, description: ev.target.value }))} className="w-full rounded-lg border border-ink-200 bg-paper px-2 py-1.5 text-sm outline-none focus:border-volt-500" />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <select value={editForm.category} onChange={(ev) => setEditForm((f) => ({ ...f, category: ev.target.value as ExpenseCategory }))} className="w-full rounded-lg border border-ink-200 bg-paper px-2 py-1.5 text-sm outline-none focus:border-volt-500">
+                        {EXPENSE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <input type="number" min={1} value={editForm.amount} onChange={(ev) => setEditForm((f) => ({ ...f, amount: ev.target.value }))} className="w-full rounded-lg border border-ink-200 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-volt-500" />
+                    </td>
+                    <td className="py-3 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => void saveEdit()} disabled={savingEdit} className="inline-flex items-center gap-1 text-xs font-bold text-volt-600 hover:underline disabled:opacity-50 dark:text-volt-400">
+                          {savingEdit ? "Saving…" : "Save"}
+                        </button>
+                        <button onClick={() => setEditId(null)} className="text-xs font-bold text-ink-400 hover:underline">Cancel</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={e.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
+                    <td className="py-3 pr-4 text-ink-400">{e.date.slice(5)}</td>
+                    <td className="py-3 pr-4 font-semibold text-ink-700">{e.description}</td>
+                    <td className="py-3 pr-4"><Badge tone="gray" className="capitalize">{e.category}</Badge></td>
+                    <td className="py-3 pr-4 text-right font-bold text-ink-700">{inr(e.amount)}</td>
+                    <td className="py-3 text-right">
+                      <button onClick={() => startEdit(e)} className="inline-flex items-center gap-1 text-xs font-bold text-accent-600 hover:underline dark:text-accent-400">
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
               {monthlyRows.length === 0 && (
-                <tr><td colSpan={4} className="py-8 text-center text-ink-400">No expenses added for this month.</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-ink-400">No expenses added for this month.</td></tr>
               )}
             </tbody>
           </table>
@@ -449,10 +620,53 @@ function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses 
   );
 }
 
-export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit, equipment, expenses, monthlyExpenses }: AdminProps) {
+export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit, equipment, expenses, monthlyExpenses, dailyReminder }: AdminProps) {
   const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments" | "equipment" | "finance">("overview");
   const { push } = useToast();
   const [refunding, setRefunding] = React.useState<string | null>(null);
+  const [editTrainerId, setEditTrainerId] = React.useState<string | null>(null);
+  const [savingTrainer, setSavingTrainer] = React.useState(false);
+  const [trainerDraft, setTrainerDraft] = React.useState({
+    name: "", phone: "", email: "", specialization: "", languages: "", hourlyRate: "", yearsExp: "", rating: "", reviewCount: "", bio: "", active: true,
+  });
+
+  const startEditTrainer = (t: AdminProps["trainers"][number]) => {
+    setTrainerDraft({
+      name: t.name, phone: t.phone, email: t.email,
+      specialization: t.specializations.join(", "), languages: t.languages.join(", "),
+      hourlyRate: String(t.hourlyRate), yearsExp: String(t.yearsExp), rating: String(t.rating), reviewCount: String(t.reviewCount),
+      bio: t.bio, active: t.active,
+    });
+    setEditTrainerId(t.id);
+  };
+
+  const saveTrainer = async (id: string) => {
+    setSavingTrainer(true);
+    try {
+      const res = await fetch("/api/admin/trainers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update", id,
+          name: trainerDraft.name, phone: trainerDraft.phone, email: trainerDraft.email,
+          specializations: trainerDraft.specialization.split(",").map((s) => s.trim()).filter(Boolean),
+          languages: trainerDraft.languages.split(",").map((s) => s.trim()).filter(Boolean),
+          hourlyRate: Number(trainerDraft.hourlyRate) || 0,
+          yearsExp: Number(trainerDraft.yearsExp) || 0,
+          rating: Number(trainerDraft.rating) || 0,
+          reviewCount: Number(trainerDraft.reviewCount) || 0,
+          bio: trainerDraft.bio, active: trainerDraft.active,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Could not update the trainer.");
+      setEditTrainerId(null);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update the trainer.");
+      setSavingTrainer(false);
+    }
+  };
 
   const refund = async (id: string) => {
     if (!window.confirm("Refund this payment and cancel the linked membership?")) return;
@@ -629,7 +843,7 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
             </Card>
           </div>
 
-          <RemindersPanel />
+          <RemindersPanel initialDaily={dailyReminder} />
 
           <div className="grid gap-5 lg:grid-cols-3">
             <Card className="p-5">
@@ -683,11 +897,19 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
             {trainers.map((t) => (
               <Card key={t.id} className="p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">{t.name}</h3>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">{t.name}</h3>
+                      {!t.active && <Badge tone="gray">Inactive</Badge>}
+                    </div>
                     <p className="text-sm text-ink-400">{t.specialization}</p>
                   </div>
-                  <Badge tone="gold">★ {t.rating.toFixed(1)} · {t.reviewCount}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge tone="gold">★ {t.rating.toFixed(1)} · {t.reviewCount}</Badge>
+                    <button onClick={() => startEditTrainer(t)} disabled={savingTrainer && editTrainerId === t.id} className="inline-flex items-center gap-1 text-xs font-bold text-accent-600 hover:underline disabled:opacity-50 dark:text-accent-400">
+                      Edit
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-xl bg-ink-50 p-3 dark:bg-ink-100">
@@ -712,6 +934,67 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
                     <div className="h-full rounded-full bg-gradient-to-r from-volt-500 to-accent-500" style={{ width: `${(t.utilization / maxTrainerUtil) * 100}%` }} />
                   </div>
                 </div>
+
+                {editTrainerId === t.id && (
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); void saveTrainer(t.id); }}
+                    className="mt-4 grid gap-3 rounded-2xl border border-volt-500/30 bg-paper p-4 sm:grid-cols-2 dark:border-volt-500/30"
+                  >
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Full name</span>
+                      <input required value={trainerDraft.name} onChange={(e) => setTrainerDraft((d) => ({ ...d, name: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Phone</span>
+                      <input required value={trainerDraft.phone} onChange={(e) => setTrainerDraft((d) => ({ ...d, phone: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Email</span>
+                      <input type="email" value={trainerDraft.email} onChange={(e) => setTrainerDraft((d) => ({ ...d, email: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Hourly rate (₹)</span>
+                      <input type="number" min={0} value={trainerDraft.hourlyRate} onChange={(e) => setTrainerDraft((d) => ({ ...d, hourlyRate: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Years experience</span>
+                      <input type="number" min={0} value={trainerDraft.yearsExp} onChange={(e) => setTrainerDraft((d) => ({ ...d, yearsExp: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Rating (0–5)</span>
+                      <input type="number" step="0.1" min={0} max={5} value={trainerDraft.rating} onChange={(e) => setTrainerDraft((d) => ({ ...d, rating: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Review count</span>
+                      <input type="number" min={0} value={trainerDraft.reviewCount} onChange={(e) => setTrainerDraft((d) => ({ ...d, reviewCount: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Status</span>
+                      <select value={trainerDraft.active ? "active" : "inactive"} onChange={(e) => setTrainerDraft((d) => ({ ...d, active: e.target.value === "active" }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </label>
+                    <label className="sm:col-span-2">
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Specializations (comma separated)</span>
+                      <input value={trainerDraft.specialization} onChange={(e) => setTrainerDraft((d) => ({ ...d, specialization: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label className="sm:col-span-2">
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Languages (comma separated)</span>
+                      <input value={trainerDraft.languages} onChange={(e) => setTrainerDraft((d) => ({ ...d, languages: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <label className="sm:col-span-2">
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Bio</span>
+                      <textarea rows={2} value={trainerDraft.bio} onChange={(e) => setTrainerDraft((d) => ({ ...d, bio: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+                    </label>
+                    <div className="flex gap-2 sm:col-span-2">
+                      <Button type="submit" disabled={savingTrainer}>{savingTrainer ? "Saving…" : "Save changes"}</Button>
+                      <button type="button" onClick={() => setEditTrainerId(null)} className="rounded-lg border border-ink-100 px-4 py-2 text-sm font-bold text-ink-500 transition hover:bg-ink-100 dark:border-ink-100">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </Card>
             ))}
           </div>
