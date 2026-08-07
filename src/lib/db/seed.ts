@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import type {
   DB, User, MembershipPlan, Membership, Payment, Invoice, Attendance, GymClass, ClassRoom, Booking,
-  Exercise, WorkoutPlan, WorkoutLog, DietPlan, MealLog, DailyStat, Measurement, Equipment, InventoryItem,
+  Exercise, WorkoutPlan, WorkoutLog, DietPlan, MealLog, DailyStat, Measurement, Equipment, Expense, InventoryItem,
   Product, Order, Lead, Notification, Message, Ticket, Coupon, Review, BlogPost, Referral, Achievement, Challenge,
   AutomationLog, AuditEntry, Settings, LeadSource, LeadStatus, NotifChannel,
 } from "./types";
@@ -621,6 +621,21 @@ export function buildSeed(): DB {
     { id: "eq_12", name: "Battle Ropes & Sleds", category: "Functional", status: "operational", usageHours: 1500, lastMaintenance: daysAgo(50), nextMaintenance: daysAhead(90) },
   ];
 
+  /* ----------------------------- Expenses ---------------------------- */
+
+  const expenses: Expense[] = [
+    { id: "exp_1", category: "rent", description: "Club rent — MG Road flagship", amount: 425000, date: daysAgo(1), createdAt: tsAgo(1) },
+    { id: "exp_2", category: "salaries", description: "Coach & staff payroll (30 staff)", amount: 1280000, date: daysAgo(2), createdAt: tsAgo(2) },
+    { id: "exp_3", category: "utilities", description: "Electricity & water", amount: 96000, date: daysAgo(4), createdAt: tsAgo(4) },
+    { id: "exp_4", category: "equipment", description: "Cable pulley bearing replacement", amount: 18400, date: daysAgo(5), createdAt: tsAgo(5) },
+    { id: "exp_5", category: "marketing", description: "Instagram & Google ads", amount: 75000, date: daysAgo(6), createdAt: tsAgo(6) },
+    { id: "exp_6", category: "supplements", description: "Shop restock — whey & creatine", amount: 142000, date: daysAgo(7), createdAt: tsAgo(7) },
+    { id: "exp_7", category: "utilities", description: "Internet & music licensing", amount: 14500, date: daysAgo(8), createdAt: tsAgo(8) },
+    { id: "exp_8", category: "equipment", description: "AMC — Matrix treadmills", amount: 38000, date: daysAgo(10), createdAt: tsAgo(10) },
+    { id: "exp_9", category: "misc", description: "Cleaning, towels & consumables", amount: 52000, date: daysAgo(11), createdAt: tsAgo(11) },
+    { id: "exp_10", category: "salaries", description: "Front desk & physio contractors", amount: 156000, date: daysAgo(12), createdAt: tsAgo(12) },
+  ];
+
   /* ---------------------------- Inventory ---------------------------- */
 
   const inventory: InventoryItem[] = [
@@ -899,7 +914,7 @@ export function buildSeed(): DB {
 
   return {
     users, memberships, plans, payments, invoices, attendance, classes, rooms, bookings, exercises,
-    workoutPlans, workoutLogs, dietPlans, mealLogs, dailyStats, measurements, equipment, inventory,
+    workoutPlans, workoutLogs, dietPlans, mealLogs, dailyStats, measurements, equipment, expenses, inventory,
     products, orders, leads, notifications, messages, tickets, coupons, reviews, blogPosts, referrals, achievements,
     challenges, otps: [], automationLogs, auditLogs, settings, counters: dbCounters,
   };
@@ -942,6 +957,7 @@ export function shiftDemoDates(db: DB, days: number): void {
   db.mealLogs.forEach((r) => { r.date = shiftDateStr(r.date, days); r.createdAt = shiftDateStr(r.createdAt, days); });
   db.dailyStats.forEach((r) => { r.date = shiftDateStr(r.date, days); });
   db.measurements.forEach((r) => { r.date = shiftDateStr(r.date, days); });
+  db.expenses.forEach((r) => { r.date = shiftDateStr(r.date, days); r.createdAt = shiftDateStr(r.createdAt, days); });
   db.equipment.forEach((r) => {
     if (r.lastMaintenance) r.lastMaintenance = shiftDateStr(r.lastMaintenance, days);
     if (r.nextMaintenance) r.nextMaintenance = shiftDateStr(r.nextMaintenance, days);

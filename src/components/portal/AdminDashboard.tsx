@@ -5,11 +5,13 @@ import Link from "next/link";
 import {
   Activity, ArrowDownRight, ArrowUpRight, CalendarCheck, CircleDollarSign, Clock4,
   CreditCard, Flame, Percent, ReceiptText, RotateCcw, ShieldAlert, Ticket, TrendingUp, Users, Boxes,
+  Wrench, Wallet, Plus, Banknote,
 } from "lucide-react";
 import { Card, Badge, Button } from "@/components/ui";
 import { DonutChart, TrendAreaChart, WorkoutBarsChart } from "@/components/portal/PortalCharts";
 import { useToast } from "@/lib/client";
 import { cn } from "@/lib/utils";
+import type { EquipmentStatus, ExpenseCategory } from "@/lib/db/types";
 
 type Kpis = {
   activeMembers: number;
@@ -40,6 +42,9 @@ type AdminProps = {
   trainers: { id: string; name: string; specialization: string; rating: number; reviewCount: number; upcoming: number; completed: number; revenue: number; utilization: number }[];
   payments: { id: string; ref: string; description: string; amount: number; method: string; status: string; createdAt: string; member: string; invoiceNo?: string }[];
   recentAudit: { id: string; action: string; actor: string; meta?: string; createdAt: string }[];
+  equipment: { id: string; name: string; category: string; status: EquipmentStatus; usageHours: number; lastMaintenance: string | null; nextMaintenance: string | null; warrantyExpiry: string | null; amcProvider: string | null; notes: string | null }[];
+  expenses: { id: string; category: string; description: string; amount: number; date: string }[];
+  monthlyExpenses: number;
 };
 
 function KpiCard({ icon, label, value, sub, delta, tone = "green" }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: string; delta?: number; tone?: "green" | "blue" | "gold" | "red" | "orange" }) {
@@ -142,8 +147,310 @@ function RemindersPanel() {
   );
 }
 
-export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit }: AdminProps) {
-  const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments">("overview");
+const EQUIP_STATUSES: EquipmentStatus[] = ["operational", "maintenance", "repair", "out_of_service"];
+
+type EquipmentRow = AdminProps["equipment"][number];
+
+function EquipmentPanel({ initialEquipment }: { initialEquipment: EquipmentRow[] }) {
+  const [items, setItems] = React.useState<EquipmentRow[]>(initialEquipment);
+  const [busy, setBusy] = React.useState(false);
+  const [adding, setAdding] = React.useState(false);
+  const [form, setForm] = React.useState({ name: "", category: "Strength", status: "operational" as EquipmentStatus, usageHours: "", amcProvider: "", notes: "" });
+
+  const load = async () => {
+    const res = await fetch("/api/admin/equipment");
+    if (res.ok) {
+      const d = await res.json();
+      setItems(d.equipment ?? []);
+    }
+  };
+
+  const setStatus = async (id: string, status: EquipmentStatus) => {
+    await fetch("/api/admin/equipment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "status", id, status }),
+    });
+    void load();
+  };
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/equipment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add", ...form, usageHours: Number(form.usageHours) || 0 }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? "Could not add equipment.");
+      }
+      setForm({ name: "", category: "Strength", status: "operational", usageHours: "", amcProvider: "", notes: "" });
+      setAdding(false);
+      void load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const attention = items.filter((i) => i.status !== "operational").length;
+  const needsService = items.filter((i) => i.nextMaintenance && i.nextMaintenance <= new Date().toISOString().slice(0, 10)).length;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard icon={<Wrench className="size-5" />} label="Total equipment" value={items.length} tone="blue" />
+        <KpiCard icon={<Activity className="size-5" />} label="Operational" value={items.filter((i) => i.status === "operational").length} tone="green" />
+        <KpiCard icon={<ShieldAlert className="size-5" />} label="Needs attention" value={attention} tone="orange" />
+        <KpiCard icon={<Clock4 className="size-5" />} label="Service due" value={needsService} tone="red" />
+      </div>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Equipment list</h2>
+            <p className="mt-0.5 text-sm text-ink-400">Status, usage hours and maintenance schedule across the club.</p>
+          </div>
+          <Button onClick={() => setAdding((v) => !v)} disabled={busy}>
+            <Plus className="size-4" /> {adding ? "Cancel" : "Add equipment"}
+          </Button>
+        </div>
+
+        {adding && (
+          <form onSubmit={add} className="mt-4 grid gap-3 rounded-2xl border border-ink-100 bg-paper p-4 sm:grid-cols-2 lg:grid-cols-4 dark:border-ink-100">
+            <label className="sm:col-span-2">
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Name</span>
+              <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Treadmill — Matrix T75" className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Category</span>
+              <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500">
+                {["Strength", "Cardio", "Boxing", "Functional", "Recovery"].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Status</span>
+              <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as EquipmentStatus }))} className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500">
+                {EQUIP_STATUSES.map((s) => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Usage hours</span>
+              <input type="number" min={0} value={form.usageHours} onChange={(e) => setForm((f) => ({ ...f, usageHours: e.target.value }))} placeholder="0" className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">AMC provider (optional)</span>
+              <input value={form.amcProvider} onChange={(e) => setForm((f) => ({ ...f, amcProvider: e.target.value }))} placeholder="e.g. Matrix AMC" className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <label className="lg:col-span-3">
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Notes (optional)</span>
+              <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Condition, serial, location…" className="w-full rounded-lg border border-ink-200 bg-card px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <div className="flex items-end">
+              <Button type="submit" className="w-full" disabled={busy}>{busy ? "Saving…" : "Save equipment"}</Button>
+            </div>
+          </form>
+        )}
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-400 dark:border-ink-100">
+                <th className="pb-2.5 pr-4 font-semibold">Equipment</th>
+                <th className="pb-2.5 pr-4 font-semibold">Category</th>
+                <th className="pb-2.5 pr-4 font-semibold">Status</th>
+                <th className="pb-2.5 pr-4 font-semibold">Usage</th>
+                <th className="pb-2.5 pr-4 font-semibold">Last service</th>
+                <th className="pb-2.5 pr-4 font-semibold">Next service</th>
+                <th className="pb-2.5 font-semibold">AMC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
+                  <td className="py-3 pr-4">
+                    <p className="font-semibold text-ink-700">{item.name}</p>
+                    {item.notes && <p className="text-xs text-ink-400">{item.notes}</p>}
+                  </td>
+                  <td className="py-3 pr-4"><Badge tone="gray">{item.category}</Badge></td>
+                  <td className="py-3 pr-4">
+                    <select
+                      value={item.status}
+                      onChange={(e) => setStatus(item.id, e.target.value as EquipmentStatus)}
+                      className={cn("rounded-lg border px-2 py-1.5 text-xs font-bold capitalize outline-none", item.status === "operational" ? "border-volt-500/30 bg-volt-500/10 text-volt-700 dark:text-volt-400" : item.status === "maintenance" ? "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400" : item.status === "repair" ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400" : "border-ink-200 bg-ink-50 text-ink-400")}
+                    >
+                      {EQUIP_STATUSES.map((s) => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-3 pr-4 text-ink-500">{item.usageHours.toLocaleString()} h</td>
+                  <td className="py-3 pr-4 text-ink-400">{item.lastMaintenance ? item.lastMaintenance.slice(5) : "—"}</td>
+                  <td className={cn("py-3 pr-4", item.nextMaintenance && item.nextMaintenance <= new Date().toISOString().slice(0, 10) ? "font-bold text-stop-500" : "text-ink-400")}>
+                    {item.nextMaintenance ? item.nextMaintenance.slice(5) : "—"}
+                  </td>
+                  <td className="py-3 text-ink-400">{item.amcProvider ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {items.length === 0 && <p className="py-8 text-center text-sm text-ink-400">Loading equipment…</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: "rent", label: "Rent" },
+  { value: "salaries", label: "Salaries" },
+  { value: "utilities", label: "Utilities" },
+  { value: "equipment", label: "Equipment" },
+  { value: "marketing", label: "Marketing" },
+  { value: "supplements", label: "Supplements" },
+  { value: "misc", label: "Other" },
+];
+
+function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses }: { monthlyRevenue: number; initialExpenses: AdminProps["expenses"]; initialMonthlyExpenses: number }) {
+  const [expenses, setExpenses] = React.useState(initialExpenses);
+  const [monthly, setMonthly] = React.useState(initialMonthlyExpenses);
+  const [busy, setBusy] = React.useState(false);
+  const [form, setForm] = React.useState({ description: "", category: "misc" as ExpenseCategory, amount: "", date: "" });
+
+  const refresh = async () => {
+    const res = await fetch("/api/admin/expenses");
+    if (res.ok) {
+      const d = await res.json();
+      setExpenses(d.expenses ?? []);
+      setMonthly(d.monthlyTotal ?? 0);
+    }
+  };
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, amount: Number(form.amount) || 0 }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? "Could not add the expense.");
+      }
+      setForm({ description: "", category: "misc", amount: "", date: "" });
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const month = new Date().toISOString().slice(0, 7);
+  const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const monthlyRows = expenses.filter((e) => e.date.slice(0, 7) === month);
+  const net = monthlyRevenue - monthly;
+  const margin = monthlyRevenue > 0 ? (net / monthlyRevenue) * 100 : 0;
+  const catTotals = EXPENSE_CATEGORIES.map(({ value, label }) => ({
+    label,
+    total: monthlyRows.filter((e) => e.category === value).reduce((s, e) => s + e.amount, 0),
+  })).filter((c) => c.total > 0);
+  const maxCat = Math.max(1, ...catTotals.map((c) => c.total));
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <KpiCard icon={<TrendingUp className="size-5" />} label={`Revenue · ${monthLabel}`} value={inr(monthlyRevenue)} tone="green" />
+        <KpiCard icon={<Wallet className="size-5" />} label={`Expenses · ${monthLabel}`} value={inr(monthly)} tone="red" />
+        <KpiCard icon={<Banknote className="size-5" />} label="Net profit" value={inr(net)} tone={net >= 0 ? "blue" : "red"} />
+        <KpiCard icon={<Percent className="size-5" />} label="Profit margin" value={`${margin.toFixed(1)}%`} tone={margin >= 0 ? "gold" : "red"} />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Card className="p-5 lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">Expense breakdown — {monthLabel}</h2>
+            <Badge tone="red">{inr(monthly)}</Badge>
+          </div>
+          <div className="space-y-3">
+            {catTotals.length === 0 && <p className="text-sm text-ink-400">No expenses recorded this month yet.</p>}
+            {catTotals.map((c) => (
+              <div key={c.label}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="font-semibold capitalize text-ink-500">{c.label}</span>
+                  <span className="font-bold text-ink-700">{inr(c.total)}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-100">
+                  <div className="h-full rounded-full bg-gradient-to-r from-red-400 to-orange-500" style={{ width: `${(c.total / maxCat) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-900">Add expense</h2>
+          <form onSubmit={add} className="space-y-3">
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Description</span>
+              <input required value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="e.g. Electricity bill" className="w-full rounded-lg border border-ink-200 bg-paper px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Category</span>
+              <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))} className="w-full rounded-lg border border-ink-200 bg-paper px-3 py-2 text-sm outline-none focus:border-volt-500">
+                {EXPENSE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Amount (₹)</span>
+              <input required type="number" min={1} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="e.g. 25000" className="w-full rounded-lg border border-ink-200 bg-paper px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-semibold text-ink-500">Date</span>
+              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="w-full rounded-lg border border-ink-200 bg-paper px-3 py-2 text-sm outline-none focus:border-volt-500" />
+            </label>
+            <Button type="submit" className="w-full" disabled={busy}>{busy ? "Saving…" : "Add expense"}</Button>
+          </form>
+        </Card>
+      </div>
+
+      <Card className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-900">This month&apos;s expenses</h2>
+          <Badge tone="gray">{monthlyRows.length} entries</Badge>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-400 dark:border-ink-100">
+                <th className="pb-2.5 pr-4 font-semibold">Date</th>
+                <th className="pb-2.5 pr-4 font-semibold">Description</th>
+                <th className="pb-2.5 pr-4 font-semibold">Category</th>
+                <th className="pb-2.5 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyRows.map((e) => (
+                <tr key={e.id} className="border-b border-ink-100 last:border-0 dark:border-ink-100">
+                  <td className="py-3 pr-4 text-ink-400">{e.date.slice(5)}</td>
+                  <td className="py-3 pr-4 font-semibold text-ink-700">{e.description}</td>
+                  <td className="py-3 pr-4"><Badge tone="gray" className="capitalize">{e.category}</Badge></td>
+                  <td className="py-3 text-right font-bold text-ink-700">{inr(e.amount)}</td>
+                </tr>
+              ))}
+              {monthlyRows.length === 0 && (
+                <tr><td colSpan={4} className="py-8 text-center text-ink-400">No expenses added for this month.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit, equipment, expenses, monthlyExpenses }: AdminProps) {
+  const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments" | "equipment" | "finance">("overview");
   const { push } = useToast();
   const [refunding, setRefunding] = React.useState<string | null>(null);
 
@@ -171,6 +478,8 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
     { id: "operations" as const, label: "Operations" },
     { id: "trainers" as const, label: "Trainers" },
     { id: "payments" as const, label: "Payments" },
+    { id: "equipment" as const, label: "Equipment" },
+    { id: "finance" as const, label: "Finance" },
   ];
 
   return (
@@ -475,6 +784,12 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
             </p>
           </Card>
         </>
+      )}
+
+      {tab === "equipment" && <EquipmentPanel initialEquipment={equipment} />}
+
+      {tab === "finance" && (
+        <FinancePanel monthlyRevenue={kpis.thisMonthRevenue} initialExpenses={expenses} initialMonthlyExpenses={monthlyExpenses} />
       )}
     </div>
   );

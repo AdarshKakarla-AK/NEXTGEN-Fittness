@@ -25,7 +25,7 @@ const columns = [
     title: "Contact",
     links: [
       { label: "Contact us", href: "/contact" },
-      { label: "Visit the club", href: "/contact" },
+      { label: "Email the club", href: `mailto:${site.email}` },
     ],
   },
 ];

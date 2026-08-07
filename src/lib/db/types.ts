@@ -375,6 +375,19 @@ export interface Equipment {
   notes?: string;
 }
 
+/* ----------------------------- Expenses ---------------------------- */
+
+export type ExpenseCategory = "rent" | "salaries" | "utilities" | "equipment" | "marketing" | "supplements" | "misc";
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  date: string;
+  createdAt: string;
+}
+
 /* ---------------------------- Inventory ---------------------------- */
 
 export interface InventoryItem {
@@ -672,6 +685,7 @@ export interface DB {
   dailyStats: DailyStat[];
   measurements: Measurement[];
   equipment: Equipment[];
+  expenses: Expense[];
   inventory: InventoryItem[];
   products: Product[];
   orders: Order[];

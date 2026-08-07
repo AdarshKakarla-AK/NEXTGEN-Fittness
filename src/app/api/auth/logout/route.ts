@@ -3,8 +3,8 @@ import { sessionKey } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-export async function POST() {
-  const res = NextResponse.json({ ok: true });
+export async function POST(req: Request) {
+  const res = NextResponse.redirect(new URL("/", req.url), 303);
   res.cookies.set(sessionKey, "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 });
   return res;
 }

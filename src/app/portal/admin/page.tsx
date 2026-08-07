@@ -34,6 +34,14 @@ export default async function AdminPage() {
   const newLeads30 = db.leads.filter((l) => l.createdAt.slice(0, 10) >= isoDaysFromNow(-30)).length;
   const lowStock = db.inventory.filter((i) => i.stock <= i.lowStockThreshold).length;
 
+  const expenses = db.expenses
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map((e) => ({ id: e.id, category: e.category, description: e.description, amount: e.amount, date: e.date }));
+  const monthlyExpenses = expenses
+    .filter((e) => e.date.slice(0, 7) === today.slice(0, 7))
+    .reduce((s, e) => s + e.amount, 0);
+
   return (
     <AdminDashboard
       name={user.name}
@@ -72,6 +80,20 @@ export default async function AdminPage() {
         invoiceNo: p.invoiceNo,
       }))}
       recentAudit={db.auditLogs.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 8).map((l) => ({ id: l.id, action: l.action, actor: l.actorName ?? l.actorId, meta: l.meta, createdAt: l.createdAt }))}
+      equipment={db.equipment.map((e) => ({
+        id: e.id,
+        name: e.name,
+        category: e.category,
+        status: e.status,
+        usageHours: e.usageHours,
+        lastMaintenance: e.lastMaintenance ?? null,
+        nextMaintenance: e.nextMaintenance ?? null,
+        warrantyExpiry: e.warrantyExpiry ?? null,
+        amcProvider: e.amcProvider ?? null,
+        notes: e.notes ?? null,
+      }))}
+      expenses={expenses}
+      monthlyExpenses={monthlyExpenses}
     />
   );
 }

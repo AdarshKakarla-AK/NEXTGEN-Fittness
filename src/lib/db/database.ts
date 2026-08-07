@@ -14,7 +14,7 @@ export interface DatabaseHandle {
 
 // Bump SCHEMA_VERSION when a migration below is added. Migrations run in order
 // on boot against any database that predates the current version.
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // Backfill the blogPosts collection for databases that predate it. Repeating
 // the backfill across versions keeps it idempotent and aligned to the index
@@ -24,10 +24,16 @@ const backfillBlogPosts = (db: DB) => {
   db.blogPosts = buildSeed().blogPosts;
 };
 
+const backfillExpenses = (db: DB) => {
+  if (db.expenses.length > 0) return;
+  db.expenses = buildSeed().expenses;
+};
+
 export const MIGRATIONS: ((db: DB) => void)[] = [
   backfillBlogPosts, // 0: v0 -> v1
   backfillBlogPosts, // 1: v1 -> v2
   backfillBlogPosts, // 2: v2 -> v3
+  backfillExpenses, // 3: v3 -> v4
 ];
 
 const ARRAY_COLLECTIONS: (keyof DB)[] = [
@@ -48,6 +54,7 @@ const ARRAY_COLLECTIONS: (keyof DB)[] = [
   "dailyStats",
   "measurements",
   "equipment",
+  "expenses",
   "inventory",
   "products",
   "orders",
