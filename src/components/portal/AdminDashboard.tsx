@@ -624,6 +624,7 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
   const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments" | "equipment" | "finance">("overview");
   const { push } = useToast();
   const [refunding, setRefunding] = React.useState<string | null>(null);
+  const [trainerList, setTrainerList] = React.useState(trainers);
   const [editTrainerId, setEditTrainerId] = React.useState<string | null>(null);
   const [savingTrainer, setSavingTrainer] = React.useState(false);
   const [trainerDraft, setTrainerDraft] = React.useState({
@@ -643,27 +644,33 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
   const saveTrainer = async (id: string) => {
     setSavingTrainer(true);
     try {
+      const specializations = trainerDraft.specialization.split(",").map((s) => s.trim()).filter(Boolean);
+      const languages = trainerDraft.languages.split(",").map((s) => s.trim()).filter(Boolean);
+      const hourlyRate = Number(trainerDraft.hourlyRate) || 0;
+      const yearsExp = Number(trainerDraft.yearsExp) || 0;
+      const rating = Number(trainerDraft.rating) || 0;
+      const reviewCount = Number(trainerDraft.reviewCount) || 0;
       const res = await fetch("/api/admin/trainers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "update", id,
           name: trainerDraft.name, phone: trainerDraft.phone, email: trainerDraft.email,
-          specializations: trainerDraft.specialization.split(",").map((s) => s.trim()).filter(Boolean),
-          languages: trainerDraft.languages.split(",").map((s) => s.trim()).filter(Boolean),
-          hourlyRate: Number(trainerDraft.hourlyRate) || 0,
-          yearsExp: Number(trainerDraft.yearsExp) || 0,
-          rating: Number(trainerDraft.rating) || 0,
-          reviewCount: Number(trainerDraft.reviewCount) || 0,
+          specializations, languages, hourlyRate, yearsExp, rating, reviewCount,
           bio: trainerDraft.bio, active: trainerDraft.active,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? "Could not update the trainer.");
+      setTrainerList((prev) => prev.map((t) =>
+        t.id === id
+          ? { ...t, name: trainerDraft.name, phone: trainerDraft.phone, email: trainerDraft.email, specialization: specializations[0] ?? "General", specializations, languages, hourlyRate, yearsExp, rating, reviewCount, active: trainerDraft.active, bio: trainerDraft.bio }
+          : t
+      ));
       setEditTrainerId(null);
-      window.location.reload();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not update the trainer.");
+    } finally {
       setSavingTrainer(false);
     }
   };
@@ -685,7 +692,7 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
 
   const funnelColors: Record<string, string> = { new: "#3385ff", contacted: "#22c55e", interested: "#eab308", demo_booked: "#f97316", negotiation: "#a855f7", won: "#22c55e", lost: "#ef4444" };
   const maxFunnel = Math.max(1, ...funnel.map((f) => f.value));
-  const maxTrainerUtil = Math.max(1, ...trainers.map((t) => t.utilization));
+  const maxTrainerUtil = Math.max(1, ...trainerList.map((t) => t.utilization));
 
   const tabs = [
     { id: "overview" as const, label: "Overview" },
@@ -887,14 +894,14 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
       {tab === "trainers" && (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KpiCard icon={<Activity className="size-5" />} label="Trainers" value={trainers.length} tone="blue" />
-            <KpiCard icon={<CalendarCheck className="size-5" />} label="Upcoming sessions" value={trainers.reduce((s, t) => s + t.upcoming, 0)} tone="green" />
-            <KpiCard icon={<ReceiptText className="size-5" />} label="Sessions completed" value={trainers.reduce((s, t) => s + t.completed, 0)} tone="gold" />
-            <KpiCard icon={<CreditCard className="size-5" />} label="PT revenue" value={inr(trainers.reduce((s, t) => s + t.revenue, 0))} tone="green" />
+            <KpiCard icon={<Activity className="size-5" />} label="Trainers" value={trainerList.length} tone="blue" />
+            <KpiCard icon={<CalendarCheck className="size-5" />} label="Upcoming sessions" value={trainerList.reduce((s, t) => s + t.upcoming, 0)} tone="green" />
+            <KpiCard icon={<ReceiptText className="size-5" />} label="Sessions completed" value={trainerList.reduce((s, t) => s + t.completed, 0)} tone="gold" />
+            <KpiCard icon={<CreditCard className="size-5" />} label="PT revenue" value={inr(trainerList.reduce((s, t) => s + t.revenue, 0))} tone="green" />
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            {trainers.map((t) => (
+            {trainerList.map((t) => (
               <Card key={t.id} className="p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
