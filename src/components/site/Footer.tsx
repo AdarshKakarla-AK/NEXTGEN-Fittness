@@ -4,36 +4,28 @@ import { site } from "@/lib/site";
 
 const columns = [
   {
-    title: "Programs",
+    title: "Explore",
     links: [
+      { label: "Home", href: "/" },
       { label: "Membership Plans", href: "/membership" },
       { label: "Group Classes", href: "/classes" },
-      { label: "Personal Training", href: "/personal-training" },
-      { label: "Nutrition Coaching", href: "/nutrition" },
-      { label: "Corporate Membership", href: "/corporate" },
-      { label: "Franchise", href: "/franchise" },
-    ],
-  },
-  {
-    title: "Club",
-    links: [
-      { label: "About Us", href: "/about" },
-      { label: "Trainers", href: "/trainers" },
-      { label: "Success Stories", href: "/success-stories" },
-      { label: "Gallery", href: "/gallery" },
-      { label: "Events", href: "/events" },
-      { label: "Careers", href: "/careers" },
-    ],
-  },
-  {
-    title: "Support",
-    links: [
-      { label: "Contact", href: "/contact" },
-      { label: "FAQ", href: "/faq" },
-      { label: "Shop", href: "/shop" },
       { label: "Blog", href: "/blog" },
-      { label: "Privacy Policy", href: "/privacy-policy" },
-      { label: "Terms of Service", href: "/terms" },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { label: "Sign in", href: "/login" },
+      { label: "Create an account", href: "/register" },
+      { label: "Member dashboard", href: "/portal" },
+      { label: "Admin dashboard", href: "/portal/admin" },
+    ],
+  },
+  {
+    title: "Contact",
+    links: [
+      { label: "Contact us", href: "/contact" },
+      { label: "Visit the club", href: "/contact" },
     ],
   },
 ];
@@ -101,10 +93,10 @@ export function Footer() {
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 text-xs text-white/40 sm:flex-row">
           <p>© {new Date().getFullYear()} NEXTGEN FITNESS. All rights reserved.</p>
           <div className="flex gap-5">
-            <Link href="/terms" className="hover:text-white/70">Terms</Link>
-            <Link href="/privacy-policy" className="hover:text-white/70">Privacy</Link>
-            <Link href="/refund-policy" className="hover:text-white/70">Refund Policy</Link>
-            <Link href="/cancellation-policy" className="hover:text-white/70">Cancellation</Link>
+            <Link href="/membership" className="hover:text-white/70">Membership</Link>
+            <Link href="/classes" className="hover:text-white/70">Classes</Link>
+            <Link href="/blog" className="hover:text-white/70">Blog</Link>
+            <Link href="/contact" className="hover:text-white/70">Contact</Link>
           </div>
         </div>
       </div>

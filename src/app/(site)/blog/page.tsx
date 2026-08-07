@@ -1,6 +1,5 @@
-import Link from "next/link";
 import Image from "next/image";
-import { Clock, ArrowRight, Tag } from "lucide-react";
+import { Clock, Tag } from "lucide-react";
 import { getDB } from "@/lib/db/store";
 import { PageHero, CTAStrip, FinalCTA } from "@/components/site/PageHero";
 
@@ -31,10 +30,7 @@ export default function BlogPage() {
       <section className="bg-paper py-16 dark:bg-paper">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           {featured && (
-            <Link
-              href={`/blog/${featured.slug}`}
-              className="group grid overflow-hidden rounded-3xl border border-ink-100 bg-card shadow-sm transition hover:shadow-xl lg:grid-cols-2 dark:border-ink-100"
-            >
+            <article className="group grid overflow-hidden rounded-3xl border border-ink-100 bg-card shadow-sm lg:grid-cols-2 dark:border-ink-100">
               <div className="relative aspect-[16/10] overflow-hidden lg:aspect-auto">
                 <Image src={featured.cover} alt={featured.title} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover transition duration-700 group-hover:scale-105" priority />
               </div>
@@ -53,17 +49,15 @@ export default function BlogPage() {
                     <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{featured.author}</p>
                     <p className="text-xs text-ink-400">{featured.authorRole} · {new Date(featured.publishedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
-                  <ArrowRight className="ml-auto size-5 text-volt-500 transition group-hover:translate-x-1" />
                 </div>
               </div>
-            </Link>
+            </article>
           )}
 
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <Link
+              <article
                 key={post.id}
-                href={`/blog/${post.slug}`}
                 className="group flex flex-col overflow-hidden rounded-2xl border border-ink-100 bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-ink-100"
               >
                 <div className="relative aspect-[16/9] overflow-hidden">
@@ -83,7 +77,7 @@ export default function BlogPage() {
                     ))}
                   </div>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
 

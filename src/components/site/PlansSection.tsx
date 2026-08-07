@@ -118,7 +118,7 @@ export function PlansSection({ plans }: { plans: MembershipPlan[] }) {
         </Stagger>
 
         <p className="mt-8 text-center text-sm text-ink-400">
-          Looking for Student or Family plans? <Link href="/faq" className="font-semibold text-volt-600 hover:underline dark:text-volt-400">See the full list →</Link>
+          Looking for a Student or Family plan? <Link href="/register" className="font-semibold text-volt-600 hover:underline dark:text-volt-400">Create your account →</Link>
         </p>
       </div>
     </section>

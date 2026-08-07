@@ -49,7 +49,7 @@ export default function ContactPage() {
                   <p className="flex items-center gap-2.5"><Car className="size-4 text-volt-500" /> Valet parking at the Pulse Tower entrance</p>
                 </div>
               </div>
-              <Link href="/about" className="text-sm font-semibold text-volt-600 hover:underline dark:text-volt-400">Read our story →</Link>
+              <Link href="/membership" className="text-sm font-semibold text-volt-600 hover:underline dark:text-volt-400">See membership plans →</Link>
             </div>
             <div className="lg:col-span-3">
               <ContactForm />

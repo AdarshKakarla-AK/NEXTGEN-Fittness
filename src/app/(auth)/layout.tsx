@@ -18,9 +18,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </header>
         {children}
         <footer className="py-8 text-center text-xs text-ink-400">
-          © {new Date().getFullYear()} NEXTGEN FITNESS · <Link href="/terms" className="hover:underline">Terms</Link> ·{" "}
-          <Link href="/privacy-policy" className="hover:underline">Privacy</Link> ·{" "}
-          <Link href="/refund-policy" className="hover:underline">Refunds</Link>
+          © {new Date().getFullYear()} NEXTGEN FITNESS
         </footer>
       </div>
     </main>
