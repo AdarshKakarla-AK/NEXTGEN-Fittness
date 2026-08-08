@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import {
-  LayoutDashboard, CalendarDays, TrendingUp, Salad, Bell, LifeBuoy, Trophy, Flame,
+  LayoutDashboard, CalendarDays, TrendingUp, Bell, Trophy, Flame,
   QrCode, CheckCircle2, Zap, Target, Clock, MapPin, MessageSquarePlus, ArrowRight,
-  Dumbbell, Receipt, Printer, Loader2, IndianRupee, UserPlus, Copy, Share2,
+  Dumbbell, Receipt, Printer, Loader2, IndianRupee,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/client";
@@ -17,15 +17,12 @@ type P = {
   plan: { name: string; price: number; durationMonths: number } | null;
   stats: { streak: number; xp: number; level: number; workoutsThisMonth: number; attendanceThisMonth: number; pastSessions: number; unread: number };
   todayWorkout: { day: string; focus: string; exercises: { name: string; sets: number; reps: string; weightKg?: number }[] } | null;
-  diet: { name: string; dailyCalories: number; goal: string; meals: { type: string; name: string; time: string; calories: number; protein: number }[] } | null;
   weightTrend: { label: string; weight: number; bodyFat?: number }[];
   weekStats: { label: string; minutes: number; sessions: number }[];
   recentLogs: { id: string; date: string; day: string; durationMin: number; caloriesBurned: number; exerciseCount: number }[];
-  mealLogDays: { date: string; calories: number; protein: number; meals: { type: string; name: string; calories: number; protein: number }[] }[];
   notifications: { id: string; title: string; body: string; link?: string; read: boolean; createdAt: string }[];
   tickets: { id: string; subject: string; status: string; priority: string; updatedAt?: string; replyCount: number }[];
   achievements: { id: string; title: string; badge: string; unlockedAt: string }[];
-  referrals: { code: string | null; uses: number; rewardPoints: number; totalRewarded: number; referredByName: string | null; discountPct: number; referralCount: number };
   bookings: { id: string; ref: string; type: string; date: string; time: string; durationMin: number; status: string; class?: string; trainer?: string }[];
   checkedInToday: boolean;
   branchName?: string;
@@ -42,12 +39,8 @@ const TABS = [
   { key: "bookings", label: "Bookings", icon: CalendarDays },
   { key: "training", label: "Training", icon: Dumbbell },
   { key: "progress", label: "Progress", icon: TrendingUp },
-  { key: "nutrition", label: "Nutrition", icon: Salad },
   { key: "payments", label: "Payments", icon: IndianRupee },
-  { key: "notifications", label: "Alerts", icon: Bell },
-  { key: "tickets", label: "Support", icon: LifeBuoy },
-  { key: "referrals", label: "Referrals", icon: UserPlus },
-  { key: "achievements", label: "Achievements", icon: Trophy },
+  { key: "alerts", label: "Alerts", icon: Bell },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -144,7 +137,7 @@ export function MemberPortal(p: P) {
             >
               <t.icon className="size-4" />
               {t.label}
-              {t.key === "notifications" && p.stats.unread > 0 && (
+              {t.key === "alerts" && p.stats.unread > 0 && (
                 <span className="rounded-full bg-stop-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{p.stats.unread}</span>
               )}
             </button>
@@ -300,99 +293,44 @@ export function MemberPortal(p: P) {
                 </div>
               ))}
             </div>
+            <div>
+              <h3 className="font-display text-lg font-extrabold text-ink-900 dark:text-ink-700">Achievements</h3>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {p.achievements.map((a) => (
+                  <div key={a.id} className="card-shadow flex flex-col items-center rounded-2xl border border-ink-100 bg-card p-5 text-center dark:border-ink-100">
+                    <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-400 to-gold-500 text-white">
+                      <Trophy className="size-6" />
+                    </span>
+                    <p className="mt-3 text-sm font-bold text-ink-900 dark:text-ink-700">{a.title}</p>
+                    <p className="mt-0.5 text-[11px] text-ink-400">{a.unlockedAt.slice(0, 10)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {tab === "nutrition" && (
+        {tab === "alerts" && (
           <div className="space-y-6">
-            {p.diet ? (
-              <>
-                <div className="card-shadow rounded-3xl border border-ink-100 bg-card p-6 dark:border-ink-100">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">{p.diet.name}</h3>
-                      <p className="text-sm text-ink-400">Goal: {p.diet.goal}</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Alerts</h2>
+                <Button size="sm" variant="outline" onClick={markRead}>Mark all read</Button>
+              </div>
+              <div className="space-y-2.5">
+                {p.notifications.map((n) => (
+                  <div key={n.id} className={cn("card-shadow flex gap-3 rounded-2xl border p-4", n.read ? "border-ink-100 bg-card dark:border-ink-100" : "border-volt-500/25 bg-volt-500/5")}>
+                    <span className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", n.read ? "bg-ink-300" : "bg-volt-500")} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{n.title}</p>
+                      <p className="text-sm text-ink-500">{n.body}</p>
+                      <p className="mt-1 text-[11px] text-ink-400">{new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
                     </div>
-                    <Badge className="bg-volt-500/10 text-volt-600 dark:text-volt-400">{p.diet.dailyCalories} kcal / day</Badge>
                   </div>
-                  <div className="mt-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                    {p.diet.meals.map((m, i) => (
-                      <div key={m.name + i} className="rounded-xl border border-ink-100 bg-paper p-4 dark:border-ink-100">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-volt-600 dark:text-volt-400">{m.type} · {m.time}</p>
-                        <p className="mt-1 text-sm font-semibold text-ink-900 dark:text-ink-700">{m.name}</p>
-                        <p className="mt-1 text-xs text-ink-400">{m.calories} kcal · {m.protein}g protein</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <h3 className="font-display text-lg font-extrabold text-ink-900 dark:text-ink-700">Recent food logs</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {p.mealLogDays.map((d) => (
-                    <div key={d.date} className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{d.date}</p>
-                        <p className="text-xs text-ink-400">{d.calories} kcal · {d.protein}g P</p>
-                      </div>
-                      <div className="mt-3 space-y-1.5">
-                        {d.meals.map((m, i) => (
-                          <p key={i} className="text-xs text-ink-500"><span className="font-semibold capitalize">{m.type}:</span> {m.name}</p>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-ink-200 p-10 text-center text-sm text-ink-400">
-                No active nutrition plan. Add nutrition coaching from the Nutrition page.
-              </p>
-            )}
-          </div>
-        )}
-
-        {tab === "notifications" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Notifications</h2>
-              <Button size="sm" variant="outline" onClick={markRead}>Mark all read</Button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2.5">
-              {p.notifications.map((n) => (
-                <div key={n.id} className={cn("card-shadow flex gap-3 rounded-2xl border p-4", n.read ? "border-ink-100 bg-card dark:border-ink-100" : "border-volt-500/25 bg-volt-500/5")}>
-                  <span className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", n.read ? "bg-ink-300" : "bg-volt-500")} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{n.title}</p>
-                    <p className="text-sm text-ink-500">{n.body}</p>
-                    <p className="mt-1 text-[11px] text-ink-400">{new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === "tickets" && (
-          <TicketPanel tickets={p.tickets} push={push} />
-        )}
-
-        {tab === "referrals" && (
-          <ReferralPanel referrals={p.referrals} push={push} />
-        )}
-
-        {tab === "achievements" && (
-          <div className="space-y-6">
-            <h2 className="font-display text-xl font-extrabold text-ink-900 dark:text-ink-700">Achievements</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {p.achievements.map((a) => (
-                <div key={a.id} className="card-shadow flex flex-col items-center rounded-2xl border border-ink-100 bg-card p-5 text-center dark:border-ink-100">
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-400 to-gold-500 text-white">
-                    <Trophy className="size-6" />
-                  </span>
-                  <p className="mt-3 text-sm font-bold text-ink-900 dark:text-ink-700">{a.title}</p>
-                  <p className="mt-0.5 text-[11px] text-ink-400">{a.unlockedAt.slice(0, 10)}</p>
-                </div>
-              ))}
-            </div>
+            <TicketPanel tickets={p.tickets} push={push} />
           </div>
         )}
       </div>
@@ -493,97 +431,6 @@ function WorkoutLogForm({ push }: { push: (msg: string, type?: "success" | "erro
         <Button type="submit" disabled={busy}><Dumbbell className="size-4" /> {busy ? "Logging…" : "Log workout"}</Button>
       </div>
     </form>
-  );
-}
-
-function ReferralPanel({ referrals, push }: { referrals: P["referrals"]; push: (msg: string, type?: "success" | "error" | "info") => void }) {
-  const [code, setCode] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
-  const link = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referrals.code ?? ""}` : "";
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(referrals.code ?? "");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
-  };
-
-  const apply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) return;
-    setBusy(true);
-    const res = await fetch("/api/portal/referrals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
-    const json = await res.json();
-    setBusy(false);
-    if (!res.ok) return push(json.error || "Could not apply code", "error");
-    push("Referral applied! 🎉");
-    setTimeout(() => window.location.reload(), 900);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="card-shadow rounded-3xl border border-ink-100 bg-night-950 p-6 text-white dark:border-ink-100">
-        <div className="flex items-center gap-2">
-          <UserPlus className="size-5 text-volt-400" />
-          <h2 className="font-display text-xl font-extrabold">Invite friends, get rewarded</h2>
-        </div>
-        <p className="mt-2 max-w-xl text-sm text-white/60">
-          Share your code. When a friend joins, you earn <span className="font-bold text-volt-400">200 reward points</span> and they get
-          <span className="font-bold text-volt-400"> {referrals.discountPct}% off</span> their next renewal.
-        </p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <code className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 font-mono text-lg font-extrabold tracking-widest text-volt-400">
-            {referrals.code ?? "—"}
-          </code>
-          <Button className="bg-volt-500 text-ink-900 hover:bg-volt-400" onClick={copy}>
-            <Copy className="size-4" /> {copied ? "Copied!" : "Copy code"}
-          </Button>
-          <Button variant="outline" className="border-white/20 text-white hover:bg-white/10" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Join me at NEXTGEN Fitness! Use my code ${referrals.code} for ${referrals.discountPct}% off your next renewal.`)}`, "_blank")}>
-            <Share2 className="size-4" /> Share on WhatsApp
-          </Button>
-        </div>
-        <p className="mt-4 font-mono text-xs text-white/40">{link}</p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
-          <p className="text-3xl font-extrabold text-ink-900 dark:text-ink-700">{referrals.referralCount}</p>
-          <p className="mt-1 text-xs text-ink-400">Friends referred</p>
-        </div>
-        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
-          <p className="text-3xl font-extrabold text-volt-600 dark:text-volt-400">{referrals.rewardPoints}</p>
-          <p className="mt-1 text-xs text-ink-400">Reward points earned</p>
-        </div>
-        <div className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
-          <p className="text-3xl font-extrabold text-gold-500">{referrals.uses}</p>
-          <p className="mt-1 text-xs text-ink-400">Total code uses</p>
-        </div>
-      </div>
-
-      {referrals.referredByName ? (
-        <p className="rounded-2xl border border-volt-500/25 bg-volt-500/5 p-4 text-sm text-ink-600 dark:text-ink-400">
-          You joined on a referral from <span className="font-bold text-ink-900 dark:text-ink-700">{referrals.referredByName}</span> — your {referrals.discountPct}% renewal discount is active.
-        </p>
-      ) : (
-        <form onSubmit={apply} className="card-shadow rounded-3xl border border-ink-100 bg-card p-6 dark:border-ink-100">
-          <p className="text-sm font-bold text-ink-900 dark:text-ink-700">Had a friend at NEXTGEN? Enter their code</p>
-          <p className="mt-1 text-xs text-ink-400">You&apos;ll both get rewarded — and you&apos;ll get {referrals.discountPct}% off your next renewal.</p>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="min-w-48 flex-1">
-              <span className="mb-1.5 block text-xs font-semibold text-ink-500">Referral code</span>
-              <input
-                value={code} onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. NF001"
-                className="w-full rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 font-mono text-sm uppercase text-ink-900 placeholder:normal-case placeholder:text-ink-400 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none"
-              />
-            </label>
-            <Button type="submit" disabled={busy || !code.trim()}><ArrowRight className="size-4" /> {busy ? "Applying…" : "Apply code"}</Button>
-          </div>
-        </form>
-      )}
-    </div>
   );
 }
 

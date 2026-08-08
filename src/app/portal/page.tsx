@@ -32,8 +32,6 @@ export default async function PortalPage() {
   const todayWorkout = workoutPlan?.days?.[todayIndex % (workoutPlan.days.length || 1)] ?? workoutPlan?.days?.[0];
   const exerciseName = (id: string) => db.exercises.find((e) => e.id === id)?.name ?? id;
 
-  const dietPlan = db.dietPlans.find((p) => p.memberId === memberId && p.active);
-
   const measurements = db.measurements
     .filter((m) => m.memberId === memberId)
     .slice()
@@ -63,18 +61,6 @@ export default async function PortalPage() {
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .slice(0, 4);
 
-  const mealLogs = db.mealLogs
-    .filter((l) => l.memberId === memberId)
-    .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .slice(0, 14);
-  const mealLogByDay = new Map<string, (typeof mealLogs)[number][]>();
-  mealLogs.forEach((l) => {
-    const list = mealLogByDay.get(l.date) ?? [];
-    list.push(l);
-    mealLogByDay.set(l.date, list);
-  });
-
   const notifications = db.notifications
     .filter((n) => n.userId === memberId)
     .slice()
@@ -87,10 +73,6 @@ export default async function PortalPage() {
     .sort((a, b) => ((a.updatedAt ?? "") < (b.updatedAt ?? "") ? 1 : -1));
 
   const achievements = db.achievements.filter((a) => a.memberId === memberId);
-
-  const myReferral = db.referrals.find((r) => r.ownerId === memberId);
-  const referredCount = db.users.filter((u) => u.referredBy === memberId).length;
-  const referredBy = user.referredBy ? db.users.find((u) => u.id === user.referredBy) : undefined;
 
   const todayISO = new Date().toISOString().slice(0, 10);
   const checkedInToday = db.attendance.some((a) => a.memberId === memberId && a.date === todayISO);
@@ -156,23 +138,12 @@ export default async function PortalPage() {
         unread: unreadCount,
       }}
       todayWorkout={todayWorkout ? { day: todayWorkout.day, focus: todayWorkout.focus, exercises: todayWorkout.exercises.map((e) => ({ name: exerciseName(e.exerciseId), sets: e.sets, reps: e.reps, weightKg: e.weightKg })) } : null}
-      diet={dietPlan ? { name: dietPlan.name, dailyCalories: dietPlan.dailyCalories, goal: dietPlan.goal, meals: dietPlan.meals } : null}
       weightTrend={weightTrend}
       weekStats={weeks}
       recentLogs={workoutLogs.map((l) => ({ id: l.id, date: l.date, day: l.day ?? "", durationMin: l.durationMin, caloriesBurned: l.caloriesBurned, exerciseCount: l.exercises.length }))}
-      mealLogDays={Array.from(mealLogByDay.entries()).map(([date, logs]) => ({ date, calories: logs.reduce((s, l) => s + l.calories, 0), protein: logs.reduce((s, l) => s + l.protein, 0), meals: logs.map((l) => ({ type: l.mealType, name: l.items.join(", ") || l.mealType, calories: l.calories, protein: l.protein })) }))}
       notifications={notifications.slice(0, 12).map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, read: n.read, createdAt: n.createdAt }))}
       tickets={tickets.slice(0, 6).map((t) => ({ id: t.id, subject: t.subject, status: t.status, priority: t.priority, updatedAt: t.updatedAt, replyCount: t.replies.length }))}
       achievements={achievements.slice(0, 9).map((a) => ({ id: a.id, title: a.title, badge: a.badge, unlockedAt: a.unlockedAt }))}
-      referrals={{
-        code: user.referralCode ?? myReferral?.code ?? null,
-        uses: myReferral?.uses ?? 0,
-        rewardPoints: myReferral?.rewardPoints ?? 0,
-        totalRewarded: myReferral?.totalRewarded ?? 0,
-        referredByName: referredBy?.name ?? null,
-        discountPct: db.settings.referralDiscountPct,
-        referralCount: referredCount,
-      }}
       bookings={bookingRows}
       checkedInToday={checkedInToday}
       branchName={db.settings.branches[0]?.name}
