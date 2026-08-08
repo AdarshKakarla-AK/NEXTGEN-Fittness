@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Activity, ArrowDownRight, ArrowUpRight, CalendarCheck, CircleDollarSign, Clock4,
   CreditCard, Flame, Percent, ReceiptText, RotateCcw, ShieldAlert, Ticket, TrendingUp, Users, Boxes,
-  Wrench, Wallet, Plus, Banknote,
+  Wrench, Wallet, Plus, Banknote, Send,
 } from "lucide-react";
 import { Card, Badge, Button } from "@/components/ui";
 import { DonutChart, TrendAreaChart, WorkoutBarsChart } from "@/components/portal/PortalCharts";
@@ -46,6 +46,7 @@ type AdminProps = {
   expenses: { id: string; category: string; description: string; amount: number; date: string }[];
   monthlyExpenses: number;
   dailyReminder: { enabled: boolean; time: string; message: string; lastSentAt: string | null; memberCount: number };
+  tickets: { id: string; subject: string; body: string; status: "open" | "in_progress" | "resolved" | "closed"; priority: "low" | "medium" | "high"; member: string; memberId: string | null; replies: { authorId: string; text: string; createdAt: string }[]; createdAt: string; updatedAt: string }[];
 };
 
 function KpiCard({ icon, label, value, sub, delta, tone = "green" }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: string; delta?: number; tone?: "green" | "blue" | "gold" | "red" | "orange" }) {
@@ -620,13 +621,14 @@ function FinancePanel({ monthlyRevenue, initialExpenses, initialMonthlyExpenses 
   );
 }
 
-export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit, equipment, expenses, monthlyExpenses, dailyReminder }: AdminProps) {
-  const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments" | "equipment" | "finance">("overview");
+export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday, attendanceHour, funnel, leadSource, planDist, trainers, payments, recentAudit, equipment, expenses, monthlyExpenses, dailyReminder, tickets }: AdminProps) {
+  const [tab, setTab] = React.useState<"overview" | "operations" | "trainers" | "payments" | "equipment" | "finance" | "tickets">("overview");
   const { push } = useToast();
   const [refunding, setRefunding] = React.useState<string | null>(null);
   const [trainerList, setTrainerList] = React.useState(trainers);
   const [editTrainerId, setEditTrainerId] = React.useState<string | null>(null);
   const [savingTrainer, setSavingTrainer] = React.useState(false);
+  const [ticketList, setTicketList] = React.useState(tickets);
   const [trainerDraft, setTrainerDraft] = React.useState({
     name: "", phone: "", email: "", specialization: "", languages: "", hourlyRate: "", yearsExp: "", rating: "", reviewCount: "", bio: "", active: true,
   });
@@ -701,6 +703,7 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
     { id: "payments" as const, label: "Payments" },
     { id: "equipment" as const, label: "Equipment" },
     { id: "finance" as const, label: "Finance" },
+    { id: "tickets" as const, label: "Tickets" },
   ];
 
   return (
@@ -1080,6 +1083,132 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
 
       {tab === "finance" && (
         <FinancePanel monthlyRevenue={kpis.thisMonthRevenue} initialExpenses={expenses} initialMonthlyExpenses={monthlyExpenses} />
+      )}
+
+      {tab === "tickets" && (
+        <TicketsPanel
+          tickets={ticketList}
+          onUpdate={(updated) => setTicketList(updated)}
+          push={push}
+        />
+      )}
+    </div>
+  );
+}
+
+type AdminTicket = AdminProps["tickets"][number];
+
+function TicketsPanel({ tickets, onUpdate, push }: { tickets: AdminTicket[]; onUpdate: (t: AdminTicket[]) => void; push: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [openId, setOpenId] = React.useState<string | null>(null);
+  const [reply, setReply] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  const statusTone = (s: string) => (s === "open" ? "red" : s === "in_progress" ? "orange" : "green") as "red" | "orange" | "green";
+  const priorityTone = (p: string) => (p === "high" ? "red" : p === "medium" ? "orange" : "gray") as "red" | "orange" | "gray";
+  const openTickets = tickets.filter((t) => t.status === "open" || t.status === "in_progress");
+
+  const post = async (body: Record<string, unknown>): Promise<boolean> => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push(json.error || "Update failed", "error");
+        return false;
+      }
+      return true;
+    } catch {
+      push("Update failed", "error");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setStatus = async (t: AdminTicket, status: AdminTicket["status"]) => {
+    if (!(await post({ id: t.id, action: "status", status }))) return;
+    onUpdate(tickets.map((x) => (x.id === t.id ? { ...x, status, updatedAt: new Date().toISOString() } : x)));
+    push(`Ticket marked ${status}`);
+  };
+
+  const sendReply = async (t: AdminTicket) => {
+    if (!reply.trim()) return;
+    const id = t.id;
+    if (!(await post({ id, action: "reply", text: reply.trim() }))) return;
+    onUpdate(tickets.map((x) => (x.id === id ? { ...x, status: "in_progress", updatedAt: new Date().toISOString(), replies: [...x.replies, { authorId: "admin", text: reply.trim(), createdAt: new Date().toISOString() }] } : x)));
+    setReply("");
+    push("Reply sent to member");
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-900">Support tickets</h2>
+          <p className="mt-1 text-sm text-ink-400">{openTickets.length} open · {tickets.length} total</p>
+        </div>
+        <Badge tone="red">{openTickets.length} awaiting response</Badge>
+      </div>
+
+      {tickets.length === 0 ? (
+        <Card className="p-10 text-center text-sm text-ink-400">No tickets yet. Members&apos; support requests will appear here.</Card>
+      ) : (
+        <div className="space-y-3">
+          {tickets.map((t) => (
+            <Card key={t.id} className="p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-ink-900 dark:text-ink-700">{t.subject}</p>
+                    <Badge tone={priorityTone(t.priority)} className="capitalize">{t.priority}</Badge>
+                    <Badge tone={statusTone(t.status)} className="capitalize">{t.status.replace("_", " ")}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-ink-400">{t.member} · opened {t.createdAt.slice(0, 10)} · {t.replies.length} reply{t.replies.length === 1 ? "" : "s"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={t.status}
+                    onChange={(e) => setStatus(t, e.target.value as AdminTicket["status"])}
+                    disabled={busy}
+                    className="rounded-lg border border-ink-200 bg-paper px-2.5 py-1.5 text-xs font-semibold text-ink-700 focus:border-volt-500 focus:outline-none"
+                  >
+                    <option value="open">Open</option>
+                    <option value="in_progress">In progress</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                  <Button size="sm" variant="outline" onClick={() => setOpenId(openId === t.id ? null : t.id)}>
+                    {openId === t.id ? "Close" : "View"}
+                  </Button>
+                </div>
+              </div>
+
+              {openId === t.id && (
+                <div className="mt-4 space-y-3 border-t border-ink-100 pt-4 dark:border-ink-100">
+                  <div className="rounded-xl bg-paper p-4 text-sm text-ink-700 dark:bg-ink-100">{t.body}</div>
+                  {t.replies.map((r, i) => (
+                    <div key={i} className="rounded-xl border border-ink-100 bg-card p-4 text-sm text-ink-600 dark:border-ink-100">
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-400">{r.authorId === "admin" ? "You" : "Member"} · {r.createdAt.slice(0, 10)}</p>
+                      {r.text}
+                    </div>
+                  ))}
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <textarea
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      rows={2}
+                      placeholder="Reply to the member…"
+                      className="flex-1 rounded-xl border border-ink-200 bg-paper px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-volt-500 focus:ring-2 focus:ring-volt-500/20 focus:outline-none"
+                    />
+                    <Button onClick={() => sendReply(t)} disabled={busy || !reply.trim()}>
+                      <Send className="size-4" /> Send
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -65,6 +65,8 @@ export function MemberPortal(p: P) {
   const [checkedIn, setCheckedIn] = React.useState(p.checkedInToday);
   const [qr, setQr] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [notifs, setNotifs] = React.useState(p.notifications);
+  const unread = notifs.filter((n) => !n.read).length;
 
   const checkIn = async () => {
     if (checkedIn) return;
@@ -92,9 +94,14 @@ export function MemberPortal(p: P) {
   };
 
   const markRead = async () => {
-    await fetch("/api/portal/notifications/read", { method: "POST" }).catch(() => {});
+    const res = await fetch("/api/portal/notifications/read", { method: "POST" }).catch(() => null);
+    if (res?.ok) setNotifs((xs) => xs.map((n) => ({ ...n, read: true })));
     push("All caught up");
-    setTimeout(() => window.location.reload(), 500);
+  };
+
+  const markOneRead = async (id: string) => {
+    setNotifs((xs) => xs.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    await fetch("/api/portal/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
   };
 
   return (
@@ -137,8 +144,8 @@ export function MemberPortal(p: P) {
             >
               <t.icon className="size-4" />
               {t.label}
-              {t.key === "alerts" && p.stats.unread > 0 && (
-                <span className="rounded-full bg-stop-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{p.stats.unread}</span>
+              {t.key === "alerts" && unread > 0 && (
+                <span className="rounded-full bg-stop-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{unread}</span>
               )}
             </button>
           ))}
@@ -318,14 +325,19 @@ export function MemberPortal(p: P) {
                 <Button size="sm" variant="outline" onClick={markRead}>Mark all read</Button>
               </div>
               <div className="space-y-2.5">
-                {p.notifications.map((n) => (
+                {notifs.map((n) => (
                   <div key={n.id} className={cn("card-shadow flex gap-3 rounded-2xl border p-4", n.read ? "border-ink-100 bg-card dark:border-ink-100" : "border-volt-500/25 bg-volt-500/5")}>
                     <span className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", n.read ? "bg-ink-300" : "bg-volt-500")} />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-ink-900 dark:text-ink-700">{n.title}</p>
                       <p className="text-sm text-ink-500">{n.body}</p>
                       <p className="mt-1 text-[11px] text-ink-400">{new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
                     </div>
+                    {!n.read && (
+                      <button onClick={() => markOneRead(n.id)} className="shrink-0 self-center text-xs font-semibold text-volt-600 hover:underline dark:text-volt-400">
+                        Mark read
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

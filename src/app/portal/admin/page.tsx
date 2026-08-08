@@ -51,6 +51,22 @@ export default async function AdminPage() {
     memberCount: db.users.filter((u) => u.role === "member" && u.active && !!u.phone).length,
   };
 
+  const adminTickets = db.tickets
+    .slice()
+    .sort((a, b) => ((a.updatedAt ?? a.createdAt) < (b.updatedAt ?? b.createdAt) ? 1 : -1))
+    .map((t) => ({
+      id: t.id,
+      subject: t.subject,
+      body: t.body,
+      status: t.status,
+      priority: t.priority,
+      member: (t.memberId && userById[t.memberId]?.name) ?? "Member",
+      memberId: t.memberId ?? null,
+      replies: t.replies,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt ?? t.createdAt,
+    }));
+
   return (
     <AdminDashboard
       name={user.name}
@@ -104,6 +120,7 @@ export default async function AdminPage() {
       expenses={expenses}
       monthlyExpenses={monthlyExpenses}
       dailyReminder={dailyReminder}
+      tickets={adminTickets}
     />
   );
 }
