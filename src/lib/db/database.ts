@@ -175,9 +175,28 @@ export function openDatabase(opts: { file: string; seed: () => DB; importJson?: 
   const setMetaStmt = sqlite.prepare(
     "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
   );
+  const readVersionStmt = sqlite.prepare("PRAGMA data_version");
 
   let cache: DB | null = null;
   let needsPersist = false;
+  let lastDataVersion = -1;
+
+  // SQLite bumps data_version whenever the database is committed — by this
+  // connection OR any other (Next dev may instantiate this module in separate
+  // bundles for pages vs API routes, each with its own connection + cache).
+  // Reloading from disk when it changes keeps every reader on the latest
+  // persisted state, which is the source of truth.
+  function readDataVersion(): number {
+    return Number((withRetry(() => readVersionStmt.get(), "data_version") as { data_version: number }).data_version ?? 0);
+  }
+
+  function reloadIfStale(): void {
+    const dv = readDataVersion();
+    if (dv === lastDataVersion) return;
+    lastDataVersion = dv;
+    const fresh = withRetry(() => loadCollections(readAllStmt.all()), "read-collections");
+    if (fresh) cache = fresh;
+  }
 
   function persist(): void {
     if (!cache) return;
@@ -222,6 +241,7 @@ export function openDatabase(opts: { file: string; seed: () => DB; importJson?: 
     cache = opts.seed();
     needsPersist = true;
   }
+  lastDataVersion = readDataVersion();
 
   const storedVersion = Number((getMetaStmt.get("schema_version") as { value: string } | undefined)?.value ?? 0) || 0;
   const needsMigration = storedVersion < SCHEMA_VERSION;
@@ -235,16 +255,20 @@ export function openDatabase(opts: { file: string; seed: () => DB; importJson?: 
 
   return {
     get(): DB {
+      reloadIfStale();
       return cache!;
     },
     mutate<T>(fn: (db: DB) => T): T {
+      reloadIfStale();
       const out = fn(cache!);
       persist();
+      lastDataVersion = readDataVersion();
       return out;
     },
     reset(seed: () => DB): DB {
       cache = seed();
       persist();
+      lastDataVersion = readDataVersion();
       return cache;
     },
     version(): number {

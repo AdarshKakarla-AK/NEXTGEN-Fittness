@@ -14,21 +14,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Subject and message are required." }, { status: 400 });
     }
     const now = nowISO();
+    let created: { id: string; subject: string; status: string; priority: string; updatedAt: string; replyCount: number } | null = null;
     mutate((d) => {
-      d.tickets.push({
+      const ticket = {
         id: uid("tkt"),
         memberId: user.id,
         subject,
         body: text,
-        status: "open",
-        priority: "medium",
+        status: "open" as const,
+        priority: "medium" as const,
         assigneeId: d.users.find((u) => u.role === "receptionist")?.id,
         replies: [],
         createdAt: now,
         updatedAt: now,
-      });
+      };
+      d.tickets.push(ticket);
+      created = { id: ticket.id, subject, status: ticket.status, priority: ticket.priority, updatedAt: now, replyCount: 0 };
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ticket: created });
   } catch {
     return NextResponse.json({ error: "Could not create ticket." }, { status: 500 });
   }

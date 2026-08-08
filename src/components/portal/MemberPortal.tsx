@@ -61,12 +61,25 @@ function Stat({ icon: Icon, label, value, tint }: { icon: React.ComponentType<{ 
 
 export function MemberPortal(p: P) {
   const { push } = useToast();
-  const [tab, setTab] = React.useState<TabKey>("dash");
+  const [tab, setTab] = React.useState<TabKey>(() => {
+    if (typeof window === "undefined") return "dash";
+    const saved = window.sessionStorage.getItem("mp-tab") as TabKey | null;
+    return saved && TABS.some((t) => t.key === saved) ? saved : "dash";
+  });
   const [checkedIn, setCheckedIn] = React.useState(p.checkedInToday);
   const [qr, setQr] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [notifs, setNotifs] = React.useState(p.notifications);
   const unread = notifs.filter((n) => !n.read).length;
+
+  const selectTab = (key: TabKey) => {
+    setTab(key);
+    try {
+      window.sessionStorage.setItem("mp-tab", key);
+    } catch {
+      /* private mode */
+    }
+  };
 
   const checkIn = async () => {
     if (checkedIn) return;
@@ -136,7 +149,7 @@ export function MemberPortal(p: P) {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => selectTab(t.key)}
               className={cn(
                 "relative flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition",
                 tab === t.key ? "bg-gradient-to-r from-volt-500 to-volt-600 text-white shadow" : "text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-100"
@@ -447,6 +460,7 @@ function WorkoutLogForm({ push }: { push: (msg: string, type?: "success" | "erro
 }
 
 function TicketPanel({ tickets, push }: { tickets: P["tickets"]; push: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [list, setList] = React.useState(tickets);
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -458,10 +472,10 @@ function TicketPanel({ tickets, push }: { tickets: P["tickets"]; push: (msg: str
     const json = await res.json();
     setBusy(false);
     if (!res.ok) return push(json.error || "Could not create ticket", "error");
+    if (json.ticket) setList((xs) => [json.ticket, ...xs]);
     push("Ticket created — we'll reply soon");
     setSubject("");
     setBody("");
-    setTimeout(() => window.location.reload(), 700);
   };
   return (
     <div className="space-y-6">
@@ -491,7 +505,7 @@ function TicketPanel({ tickets, push }: { tickets: P["tickets"]; push: (msg: str
         </div>
       </form>
       <div className="grid gap-3 sm:grid-cols-2">
-        {tickets.map((t) => (
+        {list.map((t) => (
           <div key={t.id} className="card-shadow rounded-2xl border border-ink-100 bg-card p-5 dark:border-ink-100">
             <div className="flex items-start justify-between gap-3">
               <p className="font-bold text-ink-900 dark:text-ink-700">{t.subject}</p>

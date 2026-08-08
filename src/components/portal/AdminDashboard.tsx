@@ -633,6 +633,20 @@ export function AdminDashboard({ name, kpis, revenue, growth, attendanceWeekday,
     name: "", phone: "", email: "", specialization: "", languages: "", hourlyRate: "", yearsExp: "", rating: "", reviewCount: "", bio: "", active: true,
   });
 
+  React.useEffect(() => {
+    if (tab !== "tickets") return;
+    let alive = true;
+    fetch("/api/admin/tickets")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.tickets) setTicketList(d.tickets);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tab]);
+
   const startEditTrainer = (t: AdminProps["trainers"][number]) => {
     setTrainerDraft({
       name: t.name, phone: t.phone, email: t.email,
